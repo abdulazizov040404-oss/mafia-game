@@ -9,7 +9,7 @@
 </head>
 <body class="day-mode">
     <div class="app-wrapper">
-        <!-- 1. ASOSIY LOBBY KO'RINISHI -->
+        <!-- 1. LOBBY SAHIFASI -->
         <div id="lobby-view">
             <header class="panel">
                 <div class="top-bar">
@@ -52,7 +52,7 @@
 
             <!-- Xona egasi boshqaruvi -->
             <div id="host-panel" class="panel" style="display:none; margin-top: 10px;">
-                <h4 style="font-size:0.8rem; color:var(--text-muted);">BOSQICH VAQTI SOZLAMASI:</h4>
+                <h4 style="font-size:0.8rem; color:var(--text-muted);">KUNDUZGI MUHOKAMA VAQTI:</h4>
                 <div class="time-selector">
                     <button style="flex:1;" onclick="updateTimer(60)">1 Minut</button>
                     <button style="flex:1;" onclick="updateTimer(120)">2 Minut</button>
@@ -61,21 +61,21 @@
                 <button class="btn-primary" style="width: 100%; margin-top: 4px;" onclick="startGame()">O'YINNI BOSHLASH</button>
             </div>
 
-            <!-- O'yinchilar ro'yxati -->
+            <!-- O'yinchilar va Ovozlar ro'yxati -->
             <div class="panel" style="margin-top: 10px;">
-                <h4 style="font-size:0.8rem; color:var(--text-muted); margin-bottom:8px;">O'YINCHILAR:</h4>
+                <h4 style="font-size:0.8rem; color:var(--text-muted); margin-bottom:8px;">O'YINCHILAR VA OVOZLAR:</h4>
                 <div id="players-list" class="players-box"></div>
             </div>
 
-            <!-- Amallar oynasi (Ovoz berish / Tun harakatlari) -->
+            <!-- Amallar (Ovoz berish / Tun harakatlari) -->
             <div id="actions-panel" class="panel" style="display:none; margin-top: 10px;">
                 <h4 id="action-title" style="font-size:0.8rem; color:var(--text-muted); margin-bottom:6px;">Tanlang:</h4>
                 <div id="action-buttons-box" style="display:flex; flex-direction:column; gap:6px;"></div>
             </div>
 
-            <!-- Jonli Kunduzgi Chat -->
+            <!-- Saqlanib turuvchi Jonli Chat -->
             <div class="panel" style="margin-top: 10px;">
-                <h4 id="chat-status-label" style="font-size:0.8rem; color:var(--text-muted); margin-bottom:6px;">💬 KUNDUZGI MUHOKAMA CHATI</h4>
+                <h4 id="chat-status-label" style="font-size:0.8rem; color:var(--text-muted); margin-bottom:6px;">💬 JONLI CHAT (Tarix saqlanadi)</h4>
                 <div id="chat-messages" class="chat-messages"></div>
                 <div id="chat-form" class="chat-form">
                     <input type="text" id="chat-text-input" placeholder="Xabaringizni yozing..." maxlength="200" onkeydown="if(event.key==='Enter') submitChat()">
@@ -84,7 +84,19 @@
             </div>
         </div>
 
-        <!-- 3. XONA YARATISH MODALI -->
+        <!-- 3. ROL HAQIDA MA'LUMOT (MODAL BILAN RASM) -->
+        <div id="role-modal" class="modal" style="display: none;">
+            <div class="panel role-card-content">
+                <div id="role-image-box" class="role-image-box">
+                    <img id="role-image" src="" alt="Rol rasmi">
+                </div>
+                <h3 id="role-title" style="margin: 10px 0 6px 0; text-transform: uppercase;">Sizning Rolingiz</h3>
+                <p id="role-desc" class="role-desc"></p>
+                <button class="btn-primary" style="width:100%; margin-top:14px;" onclick="closeRoleModal()">Tushundim</button>
+            </div>
+        </div>
+
+        <!-- 4. XONA YARATISH MODALI -->
         <div id="create-room-modal" class="modal" style="display: none;">
             <div class="panel" style="width: 100%; max-width: 340px;">
                 <h3 style="margin-bottom: 10px;">Yangi xona yaratish</h3>
@@ -96,7 +108,7 @@
             </div>
         </div>
 
-        <!-- 4. PROFIL MODALI -->
+        <!-- 5. PROFIL MODALI -->
         <div id="profile-modal" class="modal" style="display: none;">
             <div class="panel" style="width: 100%; max-width: 340px;">
                 <h3 style="margin-bottom: 8px;">👤 Shaxsiy Profil</h3>

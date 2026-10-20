@@ -26,8 +26,50 @@ let currentRoomId = null;
 let isHost = false;
 let myRole = "citizen";
 let isAlive = true;
+let currentPlayersData = [];
+let currentVotesData = {}; // {voter_name: target_id}
 
-// Profilni yuklash
+// Rollar haqida batafsil ma'lumot va rasmlar
+const rolesInfo = {
+    mafia: {
+        title: "🔫 SIZNING ROLINGIZ: MAFIA",
+        badge: "badge-mafia",
+        image: "https://images.unsplash.com/photo-1517849845537-4d257902454a?w=500&auto=format&fit=crop&q=60",
+        desc: "Siz shahar dushmanisiz! Vazifangiz: Tunda boshqa mafialar bilan birgalikda bir xil fuqaroni nishonga olib o'ldirish. Kunduzi esa o'zingizni begunoh fuqaro qilib ko'rsating va mafialarni fosh bo'lishdan saqlang!"
+    },
+    doctor: {
+        title: "💉 SIZNING ROLINGIZ: DOKTOR",
+        badge: "badge-doctor",
+        image: "https://images.unsplash.com/photo-1584515979956-d9f6e5d09982?w=500&auto=format&fit=crop&q=60",
+        desc: "Siz shahar himoyachisisiz! Vazifangiz: Har kecha bir o'yinchini tanlab davolaysiz. Agar siz tanlagan odamga mafia hujum qilsa, u o'lmay qoladi. Eslatma: Ketma-ket 2 kecha o'zingizni davolay olmaysiz!"
+    },
+    commissar: {
+        title: "🔍 SIZNING ROLINGIZ: KOMISSAR",
+        badge: "badge-commissar",
+        image: "https://images.unsplash.com/photo-1521791136064-7986c2920216?w=500&auto=format&fit=crop&q=60",
+        desc: "Siz qonun posbonisiz! Vazifangiz: Har kecha bir gumondorni tekshirib, uning mafia yoki tinch aholi ekanligini aniqlaysiz. Kunduzgi muhokamada aniqlagan dalillaringiz orqali xalqni to'g'ri yo'naltiring!"
+    },
+    citizen: {
+        title: "👤 SIZNING ROLINGIZ: TINCH FUQARO",
+        badge: "badge-citizen",
+        image: "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=500&auto=format&fit=crop&q=60",
+        desc: "Siz shahar tinch fuqarosisiz! Maxsus tungi kushingiz yo'q. Vazifangiz: Kunduzgi muhokamada kimning o'zini tutishi shubhali ekanligini sinchiklab kuzatish va ovoz berish orqali barcha mafialarni yo'q qilish!"
+    }
+};
+
+function showRoleModal(role) {
+    const info = rolesInfo[role] || rolesInfo.citizen;
+    document.getElementById("role-title").innerText = info.title;
+    document.getElementById("role-image").src = info.image;
+    document.getElementById("role-desc").innerText = info.desc;
+    document.getElementById("role-modal").style.display = "flex";
+    haptic("heavy");
+}
+
+function closeRoleModal() {
+    document.getElementById("role-modal").style.display = "none";
+}
+
 function showProfile() {
     document.getElementById("user-name-display").innerText = userName;
     document.getElementById("user-id-display").innerText = userId;
@@ -71,9 +113,9 @@ function refreshRooms() {
                 const div = document.createElement("div");
                 div.className = "room-card";
                 div.innerHTML = `
-                    <div class="room-meta">
-                        <span class="room-name">${r.name}</span>
-                        <span class="room-sub">ID: #${r.id} | O'yinchilar: ${r.count} | ${r.status}</span>
+                    <div>
+                        <strong style="font-size:0.95rem;">${r.name}</strong>
+                        <div style="font-size:0.75rem; color:var(--text-muted);">ID: #${r.id} | O'yinchilar: ${r.count} | ${r.status}</div>
                     </div>
                     <button class="btn-sm btn-primary" onclick="joinRoom('${r.id}')">Kirish</button>
                 `;
@@ -137,9 +179,12 @@ function joinRoom(roomId) {
             badge.className = `badge badge-${myRole}`;
             const map = { mafia: "🔫 Mafia", citizen: "👤 Fuqaro", doctor: "💉 Doktor", commissar: "🔍 Komissar" };
             badge.innerText = map[myRole] || myRole;
-            haptic("heavy");
+            // Rol haqida rasm va tushuntirish modalini chiqarish
+            showRoleModal(myRole);
         }
         else if (data.type === "phase_change") {
+            currentVotesData = {}; // Yangi bosqichda ovozlarni tozalash
+            renderPlayersList();
             handlePhaseChange(data);
         }
         else if (data.type === "timer") {
@@ -151,7 +196,14 @@ function joinRoom(roomId) {
             else el.classList.remove("urgent");
         }
         else if (data.type === "players_update") {
-            renderPlayers(data.players);
+            currentPlayersData = data.players;
+            renderPlayersList();
+        }
+        else if (data.type === "vote_update") {
+            // Kim kimga ovoz bergani kelganda
+            currentVotesData = data.votes; // {voter_name: target_id}
+            renderPlayersList();
+            appendChat("SUD", `${data.voter_name} ➔ ${data.target_name} ga ovoz berdi!`, false, true);
         }
         else if (data.type === "chat") {
             appendChat(data.sender, data.text, data.is_system);
@@ -179,7 +231,6 @@ function handlePhaseChange(data) {
     const actionBtns = document.getElementById("action-buttons-box");
     actionBtns.innerHTML = "";
 
-    // MUHOKAMA (Chat faqat shu yerda ochiq)
     if (data.phase === "discussion") {
         body.className = "day-mode";
         title.innerText = "☀️ KUNDUZGI MUHOKAMA";
@@ -187,10 +238,9 @@ function handlePhaseChange(data) {
         actionsPanel.style.display = "none";
         haptic("medium");
     }
-    // OVOZ BERISH
     else if (data.phase === "voting" || data.phase === "revoting") {
         body.className = "day-mode";
-        title.innerText = data.phase === "revoting" ? "⚖️ QAYTA OVOZ BERISH" : "🗳 OVOZ BERISH";
+        title.innerText = data.phase === "revoting" ? "⚖️ QAYTA OVOZ BERISH (30s)" : "🗳 OVOZ BERISH (30s)";
         chatForm.style.display = "none";
 
         if (isAlive) {
@@ -208,7 +258,6 @@ function handlePhaseChange(data) {
             });
         }
     }
-    // TUN
     else if (data.phase === "night") {
         body.className = "night-mode";
         title.innerText = "🌙 TUN BOSQICHI";
@@ -218,8 +267,8 @@ function handlePhaseChange(data) {
         if (isAlive && ["mafia", "doctor", "commissar"].includes(myRole)) {
             actionsPanel.style.display = "block";
             document.getElementById("action-title").innerText = 
-                myRole === "mafia" ? "Kimni yo'q qilamiz? (Konsensus)" :
-                myRole === "doctor" ? "Kimni davolaysiz?" : "Kimni tekshirasiz?";
+                myRole === "mafia" ? "Mafia: Birgalikda nishonni tanlang:" :
+                myRole === "doctor" ? "Doktor: Kimni davolaysiz?" : "Komissar: Kimni tekshirasiz?";
 
             data.targets.forEach(t => {
                 const btn = document.createElement("button");
@@ -235,10 +284,11 @@ function handlePhaseChange(data) {
     }
 }
 
-function renderPlayers(players) {
+function renderPlayersList() {
     const list = document.getElementById("players-list");
     list.innerHTML = "";
-    players.forEach(p => {
+
+    currentPlayersData.forEach(p => {
         const div = document.createElement("div");
         div.className = `player-item ${p.is_alive ? 'alive' : 'dead'}`;
         
@@ -247,19 +297,35 @@ function renderPlayers(players) {
             kickBtn = `<button class="btn-danger" onclick="kickPlayer('${p.id}')">Chiqarish</button>`;
         }
 
+        // Unga berilgan ovozlarni hisoblash va kimlar ovoz berganini ko'rsatish
+        const votersForThisPlayer = [];
+        for (const [voterName, targetId] of Object.entries(currentVotesData)) {
+            if (targetId === p.id) {
+                votersForThisPlayer.push(voterName);
+            }
+        }
+
+        let votesDisplay = "";
+        if (votersForThisPlayer.length > 0) {
+            votesDisplay = `<div class="votes-sub-row">🗳 Ovozlar (${votersForThisPlayer.length}): ${votersForThisPlayer.join(", ")}</div>`;
+        }
+
         div.innerHTML = `
-            <span>${p.name} ${p.id === userId ? '<b>(Siz)</b>' : ''}</span>
-            <div style="display:flex; align-items:center; gap:8px;">
-                <span>${p.is_alive ? '🟢 Tirik' : '💀 O\'lgan'}</span>
-                ${kickBtn}
+            <div class="player-top-row">
+                <span><strong>${p.name}</strong> ${p.id === userId ? '<b>(Siz)</b>' : ''}</span>
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <span>${p.is_alive ? '🟢 Tirik' : '💀 O\'lgan'}</span>
+                    ${kickBtn}
+                </div>
             </div>
+            ${votesDisplay}
         `;
         list.appendChild(div);
     });
 }
 
 function kickPlayer(targetId) {
-    if (confirm("Bu o'yinchini xonadan chiqarib yubormoqchimisiz?")) {
+    if (confirm("Ushbu o'yinchini xonadan chiqarib yubormoqchimisiz?")) {
         ws.send(JSON.stringify({ action: "kick", target_id: targetId }));
         haptic("warning");
     }
@@ -267,19 +333,26 @@ function kickPlayer(targetId) {
 
 function submitChat() {
     const input = document.getElementById("chat-text-input");
-    if (!input.value.trim() || !isAlive) return;
-    ws.send(JSON.stringify({ action: "chat", text: input.value.trim() }));
+    const text = input.value.trim();
+    if (!text || !isAlive) return;
+
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+        alert("Server bilan aloqa yo'q! Sahifani yangilang.");
+        return;
+    }
+
+    ws.send(JSON.stringify({ action: "chat", text: text }));
     input.value = "";
     haptic("light");
 }
 
-function appendChat(sender, text, isSystem = false) {
+function appendChat(sender, text, isSystem = false, isVote = false) {
     const box = document.getElementById("chat-messages");
     const m = document.createElement("div");
-    m.className = "chat-bubble" + (isSystem ? " system" : "");
+    m.className = "chat-bubble" + (isSystem ? " system" : "") + (isVote ? " vote-event" : "");
     m.innerHTML = isSystem ? `📢 ${text}` : `<strong>${sender}:</strong> ${text}`;
     box.appendChild(m);
-    box.scrollTop = box.scrollHeight;
+    box.scrollTop = box.scrollHeight; // Har doim eng oxirgi xabarga tushadi
 }
 
 function updateTimer(sec) {

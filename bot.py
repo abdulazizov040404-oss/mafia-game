@@ -2,9 +2,10 @@ import os
 import asyncio
 import random
 from typing import Dict, List, Optional
+from pydantic import BaseModel
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 
 app = FastAPI()
 
@@ -15,7 +16,14 @@ if os.path.exists("static"):
 async def root():
     if os.path.exists("static/index.html"):
         return FileResponse("static/index.html")
-    return {"message": "Mini App ishlamoqda. static/index.html topilmadi."}
+    return {"message": "index.html topilmadi."}
+
+stats_db: Dict[str, dict] = {}
+
+@app.get("/api/profile/{user_id}")
+async def get_profile(user_id: str):
+    data = stats_db.get(user_id, {"games": 0, "wins": 0})
+    return JSONResponse(data)
 
 class Player:
     def __init__(self, user_id: str, name: str, ws: WebSocket):
@@ -27,7 +35,10 @@ class Player:
         self.last_healed = False
 
 class GameRoom:
-    def __init__(self):
+    def __init__(self, room_id: str, name: str):
+        self.id = room_id
+        self.name = name
+        self.host_id: Optional[str] = None
         self.players: Dict[str, Player] = {}
         self.phase: str = "lobby"
         self.timer_seconds: int = 60
@@ -36,13 +47,43 @@ class GameRoom:
         self.night_actions: Dict[str, str] = {}
         self.task: Optional[asyncio.Task] = None
 
-room = GameRoom()
+rooms: Dict[str, GameRoom] = {}
 
-async def broadcast(data: dict, mafia_only: bool = False):
+class CreateRoomRequest(BaseModel):
+    name: str
+
+@app.post("/api/create_room")
+async def create_room_api(payload: CreateRoomRequest):
+    room_id = str(random.randint(1000, 9999))
+    while room_id in rooms:
+        room_id = str(random.randint(1000, 9999))
+    rooms[room_id] = GameRoom(room_id, payload.name)
+    return JSONResponse({"room_id": room_id, "name": payload.name})
+
+@app.get("/api/rooms")
+async def list_rooms():
+    active = []
+    for r_id, r in rooms.items():
+        if len(r.players) > 0 and r.phase == "lobby":
+            active.append({
+                "id": r_id,
+                "name": r.name,
+                "count": len(r.players),
+                "status": "Kutilmoqda"
+            })
+    return JSONResponse({"rooms": active})
+
+@app.get("/api/quick_join")
+async def quick_join_api():
+    candidates = [r for r in rooms.values() if r.phase == "lobby" and len(r.players) > 0]
+    if candidates:
+        chosen = random.choice(candidates)
+        return JSONResponse({"room_id": chosen.id})
+    return JSONResponse({"room_id": None})
+
+async def broadcast(room: GameRoom, data: dict):
     disconnected = []
     for pid, p in room.players.items():
-        if mafia_only and p.role != "mafia":
-            continue
         if p.ws:
             try:
                 await p.ws.send_json(data)
@@ -51,44 +92,40 @@ async def broadcast(data: dict, mafia_only: bool = False):
     for pid in disconnected:
         room.players[pid].ws = None
 
-def get_public_players():
+def get_public_players(room: GameRoom):
     return [{"id": p.id, "name": p.name, "is_alive": p.is_alive} for p in room.players.values()]
 
-async def run_game_loop():
-    while room.phase != "lobby" and room.phase != "game_over":
-        # 1. KUNDUZGI MUHOKAMA
+async def game_loop(room: GameRoom):
+    for pid in room.players.keys():
+        if pid not in stats_db:
+            stats_db[pid] = {"games": 0, "wins": 0}
+        stats_db[pid]["games"] += 1
+
+    while room.phase not in ["lobby", "game_over"]:
+        # 1. KUNDUZGI MUHOKAMA (Chat ochiq)
         room.phase = "discussion"
         room.remaining_time = room.timer_seconds
-        await broadcast({
-            "type": "phase_change",
-            "phase": "discussion",
-            "time": room.remaining_time
-        })
-        await broadcast({"type": "chat", "text": "Kunduzgi muhokama boshlandi. Gumonlanuvchilarni aniqlang!", "is_system": True})
+        await broadcast(room, {"type": "phase_change", "phase": "discussion", "time": room.remaining_time})
+        await broadcast(room, {"type": "chat", "text": "Kunduzgi muhokama boshlandi! Chat orqali fikr almashing.", "is_system": True})
 
         while room.remaining_time > 0 and room.phase == "discussion":
             await asyncio.sleep(1)
             room.remaining_time -= 1
-            await broadcast({"type": "timer", "time": room.remaining_time})
+            await broadcast(room, {"type": "timer", "time": room.remaining_time})
 
         # 2. OVOZ BERISH
         room.phase = "voting"
         room.votes.clear()
         room.remaining_time = room.timer_seconds
-        candidates = [{"id": p.id, "name": p.name} for p in room.players.values() if p.is_alive]
-        await broadcast({
-            "type": "phase_change",
-            "phase": "voting",
-            "time": room.remaining_time,
-            "candidates": candidates
-        })
+        cands = [{"id": p.id, "name": p.name} for p in room.players.values() if p.is_alive]
+        await broadcast(room, {"type": "phase_change", "phase": "voting", "time": room.remaining_time, "candidates": cands})
 
         while room.remaining_time > 0 and room.phase == "voting":
             await asyncio.sleep(1)
             room.remaining_time -= 1
-            await broadcast({"type": "timer", "time": room.remaining_time})
+            await broadcast(room, {"type": "timer", "time": room.remaining_time})
 
-        # Hisoblash va tenglik tekshiruvi
+        # OVOZLARNI HISOBLASH VA TENGLIK
         tally: Dict[str, int] = {}
         for target in room.votes.values():
             tally[target] = tally.get(target, 0) + 1
@@ -96,26 +133,20 @@ async def run_game_loop():
         eliminated_id = None
         if tally:
             max_v = max(tally.values())
-            top = [tid for tid, c in tally.items() if c == max_v]
-
+            top = [tid for tid, count in tally.items() if count == max_v]
             if len(top) > 1:
-                # Ovozlar teng: Qayta ovoz berish
+                # Qayta ovoz berish
                 room.phase = "revoting"
                 room.votes.clear()
                 room.remaining_time = room.timer_seconds
                 revote_cands = [{"id": tid, "name": room.players[tid].name} for tid in top]
-                await broadcast({
-                    "type": "phase_change",
-                    "phase": "revoting",
-                    "time": room.remaining_time,
-                    "candidates": revote_cands
-                })
-                await broadcast({"type": "chat", "text": "Ovozlar teng! Faqat teng chiqqan nomzodlarga qayta ovoz beriladi.", "is_system": True})
+                await broadcast(room, {"type": "phase_change", "phase": "revoting", "time": room.remaining_time, "candidates": revote_cands})
+                await broadcast(room, {"type": "chat", "text": "Ovozlar teng! Faqat teng chiqqan nomzodlarga qayta ovoz beriladi.", "is_system": True})
 
                 while room.remaining_time > 0 and room.phase == "revoting":
                     await asyncio.sleep(1)
                     room.remaining_time -= 1
-                    await broadcast({"type": "timer", "time": room.remaining_time})
+                    await broadcast(room, {"type": "timer", "time": room.remaining_time})
 
                 retally: Dict[str, int] = {}
                 for target in room.votes.values():
@@ -123,92 +154,96 @@ async def run_game_loop():
                         retally[target] = retally.get(target, 0) + 1
                 if retally:
                     rmax = max(retally.values())
-                    rtop = [tid for tid, c in retally.items() if c == rmax]
+                    rtop = [tid for tid, count in retally.items() if count == rmax]
                     if len(rtop) == 1:
                         eliminated_id = rtop[0]
                     else:
-                        await broadcast({"type": "chat", "text": "Qayta ovoz berishda ham tenglik! Bugun hech kim osilmadi.", "is_system": True})
+                        await broadcast(room, {"type": "chat", "text": "Qayta ovoz berishda ham tenglik! Hech kim o'yindan chetlatilmadi.", "is_system": True})
             else:
                 eliminated_id = top[0]
 
         if eliminated_id:
-            target_p = room.players[eliminated_id]
-            target_p.is_alive = False
-            await broadcast({"type": "eliminated", "target_id": eliminated_id})
-            await broadcast({"type": "chat", "text": f"Sud hukmi bilan {target_p.name} ({target_p.role.upper()}) o'yindan chetlatildi!", "is_system": True})
-            await broadcast({"type": "players_update", "players": get_public_players()})
+            victim = room.players[eliminated_id]
+            victim.is_alive = False
+            await broadcast(room, {"type": "eliminated", "target_id": eliminated_id})
+            await broadcast(room, {"type": "chat", "text": f"Ovoz berish natijasida {victim.name} o'yindan chiqarildi!", "is_system": True})
+            await broadcast(room, {"type": "players_update", "players": get_public_players(room)})
 
-        if check_victory():
+        if evaluate_game_status(room):
             break
 
         # 3. TUN BOSQICHI
         room.phase = "night"
         room.night_actions.clear()
         room.remaining_time = room.timer_seconds
-
-        alive_targets = [{"id": p.id, "name": p.name} for p in room.players.values() if p.is_alive]
-        await broadcast({
-            "type": "phase_change",
-            "phase": "night",
-            "time": room.remaining_time,
-            "targets": alive_targets
-        })
-        await broadcast({"type": "chat", "text": "Tun tushdi. Shahar ahli ko'z yumdi, faol rollar uyg'ondi...", "is_system": True})
-        await broadcast({"type": "chat", "text": "Mafialar, o'zaro kelishib bitta nishonni tanlang!", "is_system": True}, mafia_only=True)
+        targets = [{"id": p.id, "name": p.name} for p in room.players.values() if p.is_alive]
+        await broadcast(room, {"type": "phase_change", "phase": "night", "time": room.remaining_time, "targets": targets})
+        await broadcast(room, {"type": "chat", "text": "Shahar uxlamoqda... Tungi qahramonlar faollashdi.", "is_system": True})
 
         while room.remaining_time > 0 and room.phase == "night":
             await asyncio.sleep(1)
             room.remaining_time -= 1
-            await broadcast({"type": "timer", "time": room.remaining_time})
+            await broadcast(room, {"type": "timer", "time": room.remaining_time})
 
-        # Tungi natijalar
+        # Mafia konsensusi tekshiruvi
         alive_mafias = [p.id for p in room.players.values() if p.role == "mafia" and p.is_alive]
-        mafia_shots = [room.night_actions[mid] for mid in alive_mafias if mid in room.night_actions]
+        mafia_choices = [room.night_actions[mid] for mid in alive_mafias if mid in room.night_actions]
 
-        # Mafia konsensusi: Barcha tirik mafialar bitta odamni tanlagan bo'lishi kerak
-        killed_target = None
-        if len(mafia_shots) == len(alive_mafias) and len(set(mafia_shots)) == 1:
-            killed_target = mafia_shots[0]
+        killed_id = None
+        if len(mafia_choices) == len(alive_mafias) and len(set(mafia_choices)) == 1:
+            killed_id = mafia_choices[0]
 
-        # Doktor davolagan o'yinchi
-        doctor_p = next((p for p in room.players.values() if p.role == "doctor" and p.is_alive), None)
-        saved_target = room.night_actions.get(doctor_p.id) if doctor_p else None
+        doc = next((p for p in room.players.values() if p.role == "doctor" and p.is_alive), None)
+        saved_id = room.night_actions.get(doc.id) if doc else None
+        if doc:
+            doc.last_healed = (saved_id == doc.id)
 
-        if doctor_p:
-            doctor_p.last_healed = (saved_target == doctor_p.id)
-
-        if killed_target:
-            if killed_target == saved_target:
-                await broadcast({"type": "chat", "text": "Tong otdi. Tunda hujum bo'ldi, ammo mohir shifokor yaradorni saqlab qoldi!", "is_system": True})
+        if killed_id:
+            if killed_id == saved_id:
+                await broadcast(room, {"type": "chat", "text": "Doktor tuni bilan ishlab yaradorni saqlab qoldi! Hech kim o'lmadi.", "is_system": True})
             else:
-                victim = room.players[killed_target]
-                victim.is_alive = False
-                await broadcast({"type": "eliminated", "target_id": killed_target})
-                await broadcast({"type": "chat", "text": f"Tong otdi. Tunda shafqatsiz mafia tomonidan {victim.name} o'ldirildi!", "is_system": True})
-                await broadcast({"type": "players_update", "players": get_public_players()})
+                dead_p = room.players[killed_id]
+                dead_p.is_alive = False
+                await broadcast(room, {"type": "eliminated", "target_id": killed_id})
+                await broadcast(room, {"type": "chat", "text": f"Tunda Mafia tomonidan {dead_p.name} o'ldirildi!", "is_system": True})
+                await broadcast(room, {"type": "players_update", "players": get_public_players(room)})
         else:
-            await broadcast({"type": "chat", "text": "Tong otdi. Mafialar bir fikrga kela olmadi. Tunda hech kim jabrlanmadi.", "is_system": True})
+            await broadcast(room, {"type": "chat", "text": "Mafialar bir qarorga kela olmadi. Tunda hech kim o'lmadi.", "is_system": True})
 
-        if check_victory():
+        if evaluate_game_status(room):
             break
 
-def check_victory() -> bool:
+def evaluate_game_status(room: GameRoom) -> bool:
     mafias = [p for p in room.players.values() if p.role == "mafia" and p.is_alive]
-    peacefuls = [p for p in room.players.values() if p.role != "mafia" and p.is_alive]
+    citizens = [p for p in room.players.values() if p.role != "mafia" and p.is_alive]
 
+    winner = None
     if len(mafias) == 0:
+        winner = "citizens"
+        asyncio.create_task(broadcast(room, {"type": "chat", "text": "🏆 G'ALABA! Shahar yovuzlardan tozalandi! Tinch fuqarolar g'alaba qozondi!", "is_system": True}))
+    elif len(mafias) >= len(citizens):
+        winner = "mafia"
+        asyncio.create_task(broadcast(room, {"type": "chat", "text": "🏆 G'ALABA! Mafia shaharni to'liq o'z nazoratiga oldi! Mafia g'alaba qozondi!", "is_system": True}))
+
+    if winner:
         room.phase = "game_over"
-        asyncio.create_task(broadcast({"type": "chat", "text": "🏆 G'ALABA! Shahar barcha mafiyalardan tozalandi! Tinch aholi yutdi!", "is_system": True}))
-        return True
-    if len(mafias) >= len(peacefuls):
-        room.phase = "game_over"
-        asyncio.create_task(broadcast({"type": "chat", "text": "🏆 G'ALABA! Mafialar shaharni to'liq nazoratga oldi! Mafia yutdi!", "is_system": True}))
+        for p in room.players.values():
+            if (winner == "mafia" and p.role == "mafia") or (winner == "citizens" and p.role != "mafia"):
+                if p.id in stats_db:
+                    stats_db[p.id]["wins"] += 1
         return True
     return False
 
-@app.websocket("/ws/{user_id}")
-async def ws_endpoint(websocket: WebSocket, user_id: str, name: str = Query("O'yinchi")):
+@app.websocket("/ws/{room_id}/{user_id}")
+async def ws_handler(websocket: WebSocket, room_id: str, user_id: str, name: str = Query("O'yinchi")):
     await websocket.accept()
+
+    if room_id not in rooms:
+        rooms[room_id] = GameRoom(room_id, f"Xona #{room_id}")
+    room = rooms[room_id]
+
+    if not room.host_id or room.host_id not in room.players:
+        room.host_id = user_id
 
     if user_id not in room.players:
         room.players[user_id] = Player(user_id, name, websocket)
@@ -216,7 +251,12 @@ async def ws_endpoint(websocket: WebSocket, user_id: str, name: str = Query("O'y
         room.players[user_id].ws = websocket
         room.players[user_id].name = name
 
-    await broadcast({"type": "players_update", "players": get_public_players()})
+    await websocket.send_json({"type": "room_info", "id": room.id, "name": room.name})
+
+    if room.host_id == user_id and room.phase == "lobby":
+        await websocket.send_json({"type": "is_admin"})
+
+    await broadcast(room, {"type": "players_update", "players": get_public_players(room)})
 
     try:
         while True:
@@ -224,11 +264,26 @@ async def ws_endpoint(websocket: WebSocket, user_id: str, name: str = Query("O'y
             act = data.get("action")
             player = room.players.get(user_id)
 
-            if act == "set_timer":
-                room.timer_seconds = int(data.get("seconds", 60))
-                await broadcast({"type": "chat", "text": f"Vaqt {room.timer_seconds // 60} minutga o'zgartirildi.", "is_system": True})
+            # O'yinchini chiqarib yuborish (Kick)
+            if act == "kick" and room.host_id == user_id:
+                target_id = data.get("target_id")
+                if target_id in room.players and target_id != user_id:
+                    kicked_p = room.players[target_id]
+                    if kicked_p.ws:
+                        try:
+                            await kicked_p.ws.send_json({"type": "kicked"})
+                            await kicked_p.ws.close()
+                        except Exception:
+                            pass
+                    del room.players[target_id]
+                    await broadcast(room, {"type": "chat", "text": f"{kicked_p.name} xonadan chetlatildi.", "is_system": True})
+                    await broadcast(room, {"type": "players_update", "players": get_public_players(room)})
 
-            elif act == "start_game" and room.phase == "lobby":
+            elif act == "set_timer" and room.host_id == user_id:
+                room.timer_seconds = int(data.get("seconds", 60))
+                await broadcast(room, {"type": "chat", "text": f"Bosqich vaqti {room.timer_seconds // 60} minutga sozlandi.", "is_system": True})
+
+            elif act == "start_game" and room.phase == "lobby" and room.host_id == user_id:
                 p_ids = list(room.players.keys())
                 random.shuffle(p_ids)
 
@@ -242,49 +297,33 @@ async def ws_endpoint(websocket: WebSocket, user_id: str, name: str = Query("O'y
                     p = room.players[pid]
                     p.role = roles[idx]
                     p.is_alive = True
-                    p.last_healed = False
                     if p.ws:
                         await p.ws.send_json({"type": "your_role", "role": p.role})
 
-                room.task = asyncio.create_task(run_game_loop())
+                room.task = asyncio.create_task(game_loop(room))
 
             elif act == "chat" and player and player.is_alive:
-                msg = data.get("text", "").strip()
-                if not msg:
-                    continue
-
                 if room.phase == "discussion":
-                    await broadcast({"type": "chat", "sender": player.name, "text": msg})
-                elif room.phase == "night" and player.role == "mafia":
-                    await broadcast({"type": "chat", "sender": f"🕶 {player.name}", "text": msg, "is_mafia": True}, mafia_only=True)
+                    msg = data.get("text", "").strip()
+                    if msg:
+                        await broadcast(room, {"type": "chat", "sender": player.name, "text": msg})
 
             elif act == "vote" and player and player.is_alive:
                 if room.phase in ["voting", "revoting"]:
                     room.votes[user_id] = data.get("target_id")
-                    await broadcast({"type": "chat", "text": f"{player.name} o'z tanlovini qildi.", "is_system": True})
 
             elif act == "night_action" and player and player.is_alive and room.phase == "night":
                 target_id = data.get("target_id")
-
-                # Komissar o'zini tekshira olmaydi
                 if player.role == "commissar":
-                    if target_id == user_id:
-                        continue
-                    room.night_actions[user_id] = target_id
-                    target_role = room.players[target_id].role
-                    verdict = "MAFIA 🔴" if target_role == "mafia" else "TINCH AHOLI 🟢"
-                    await websocket.send_json({"type": "commissar_alert", "text": f"Tekshiruv natijasi: {room.players[target_id].name} — {verdict}"})
-
-                # Doktor ketma-ket 2 marta o'zini saqlay olmaydi
+                    if target_id != user_id:
+                        room.night_actions[user_id] = target_id
+                        verdict = "MAFIA 🔴" if room.players[target_id].role == "mafia" else "TINCH AHOLI 🟢"
+                        await websocket.send_json({"type": "commissar_alert", "text": f"Tekshiruv natijasi: {room.players[target_id].name} — {verdict}"})
                 elif player.role == "doctor":
-                    if target_id == user_id and player.last_healed:
-                        await websocket.send_json({"type": "commissar_alert", "text": "Siz ketma-ket ikki marta o'zingizni davolay olmaysiz!"})
-                        continue
-                    room.night_actions[user_id] = target_id
-
+                    if not (target_id == user_id and player.last_healed):
+                        room.night_actions[user_id] = target_id
                 elif player.role == "mafia":
                     room.night_actions[user_id] = target_id
-                    await broadcast({"type": "chat", "text": f"Mafia a'zosi {player.name} nishon tanladi.", "is_system": True}, mafia_only=True)
 
     except WebSocketDisconnect:
         if user_id in room.players:

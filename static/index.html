@@ -1,16 +1,58 @@
 <!DOCTYPE html>
 <html lang="uz">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Mafiya</title>
-  <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;600;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Mafia Online</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link rel="stylesheet" href="style.css">
 </head>
-<body>
-  <div id="app"></div>
-  <script src="bot.js"></script>
+<body class="day-mode">
+    <div class="container">
+        <header>
+            <div class="top-bar">
+                <span class="title">🎭 Mafia Club</span>
+                <span id="role-badge" class="role-badge">Kuzatuvchi</span>
+            </div>
+            <div class="status-row">
+                <span id="phase-title">Kutish zali</span>
+                <span id="timer" class="timer">01:00</span>
+            </div>
+        </header>
+
+        <!-- Admin Paneli: Taymer va Boshlash -->
+        <div id="admin-panel" class="card">
+            <h4>⏱ Bosqich vaqti:</h4>
+            <div class="btn-group">
+                <button onclick="changeTimer(60)">1 daq</button>
+                <button onclick="changeTimer(120)">2 daq</button>
+                <button onclick="changeTimer(180)">3 daq</button>
+            </div>
+            <button class="primary" style="width: 100%;" onclick="requestStartGame()">O'YINNI BOSHLASH</button>
+        </div>
+
+        <!-- O'yinchilar ro'yxati -->
+        <div class="card">
+            <h4>Tirik Fuqarolar:</h4>
+            <div id="players-grid" class="players-grid"></div>
+        </div>
+
+        <!-- Harakatlar oynasi (Ovoz berish / Tun harakatlari) -->
+        <div id="action-panel" class="card" style="display:none;">
+            <h4 id="action-heading">Nishonni tanlang:</h4>
+            <div id="action-buttons" class="actions-grid"></div>
+        </div>
+
+        <!-- Jonli Chat (Umumiy & Yashirin Mafia) -->
+        <div class="card">
+            <h4 id="chat-header">💬 Jonli Muhokama</h4>
+            <div id="chat-box" class="chat-box"></div>
+            <div class="chat-input-area" id="chat-controls">
+                <input type="text" id="chat-input" placeholder="Xabaringizni yozing..." maxlength="200" onkeydown="if(event.key==='Enter') sendChat()">
+                <button onclick="sendChat()" style="flex: 0 0 75px;">Yuborish</button>
+            </div>
+        </div>
+    </div>
+    <script src="bot.js"></script>
 </body>
 </html>

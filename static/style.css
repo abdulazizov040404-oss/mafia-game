@@ -1,45 +1,236 @@
-:root{--bg:#121828;--fg:#e8e4d9;--mut:#8b93a7;--card:#1c2338;--line:#2c3550;--acc:#c9a24b;--red:#b8394a;--ok:#4f9d7a}
-body.day{--bg:#d5dde8;--fg:#17203a;--mut:#56607a;--card:#e9eef5;--line:#b4c0d2;--acc:#8a6a1c;--red:#a3283a}
-*{box-sizing:border-box;margin:0}
-html,body{height:100%}
-body{font-family:'Bricolage Grotesque',system-ui,sans-serif;background:var(--bg);color:var(--fg);transition:background .8s,color .8s;padding:env(safe-area-inset-top,0) 0 env(safe-area-inset-bottom,0);overflow-x:hidden}
-#app{max-width:480px;margin:0 auto;min-height:100%;display:flex;flex-direction:column;padding:16px}
-h1{font-size:34px;font-weight:800;letter-spacing:-.02em}
-h2{font-size:20px;font-weight:600}
-p,.mut{color:var(--mut);font-size:14px;line-height:1.5}
-button{font:inherit;color:inherit;border:1px solid var(--line);background:var(--card);border-radius:10px;padding:12px 14px;cursor:pointer}
-button.pri{background:var(--acc);color:#14110a;border-color:var(--acc);font-weight:600}
-button.red{background:var(--red);border-color:var(--red);color:#fff}
-button:disabled{opacity:.4;cursor:default}
-button:focus-visible,input:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
-input{font:inherit;color:inherit;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px;width:100%}
-label{font-size:13px;color:var(--mut);display:block;margin-bottom:4px}
-.stack{display:flex;flex-direction:column;gap:12px}
-.row{display:flex;gap:8px;align-items:center}
-.grow{flex:1}
-.box{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px}
-.modes{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.modes button{padding:16px 10px;text-align:left}
-.modes button.on{border-color:var(--acc);box-shadow:inset 0 0 0 1px var(--acc)}
-.modes b{display:block;font-size:16px;margin-bottom:4px}
-.pl{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
-.pl button{padding:10px 6px;text-align:center;font-size:14px;position:relative;overflow-wrap:anywhere}
-.pl button.dead{opacity:.35;text-decoration:line-through}
-.pl button.sel{border-color:var(--acc);box-shadow:inset 0 0 0 2px var(--acc)}
-.pl button.talk::after{content:"";position:absolute;right:6px;top:6px;width:8px;height:8px;border-radius:50%;background:var(--ok)}
-.pl small{display:block;color:var(--mut);font-size:11px;margin-top:2px}
-.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
-.timer{font-size:28px;font-weight:800;font-variant-numeric:tabular-nums}
-#chat{flex:1;min-height:140px;max-height:34vh;overflow:auto;display:flex;flex-direction:column;gap:6px;padding:10px;font-size:14px}
-#chat .m b{color:var(--acc)}
-#chat .s{color:var(--mut);font-style:italic}
-#chat .mafia{border-left:3px solid var(--red);padding-left:8px}
-.sleep{flex:1;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;gap:14px;padding:30px 0}
-.moon{width:84px;height:84px;border-radius:50%;box-shadow:inset -22px -6px 0 0 var(--acc);transform:rotate(-20deg)}
-.role{text-align:center;padding:26px 14px;user-select:none;-webkit-user-select:none;touch-action:none}
-.role .big{font-size:26px;font-weight:800;margin:6px 0}
-.mic{width:56px;height:56px;border-radius:50%;padding:0;font-size:22px}
-.mic.live{background:var(--ok);border-color:var(--ok)}
-.code{font-size:22px;font-weight:800;letter-spacing:.08em}
-.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:10px;font-size:14px;z-index:9;max-width:90%}
-@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+:root {
+  --bg-color: #0f1016;
+  --card-bg: rgba(26, 27, 38, 0.95);
+  --accent-red: #ff3366;
+  --accent-blue: #00d2ff;
+  --accent-gold: #ffb800;
+  --text-main: #f0f3f8;
+  --text-muted: #8b9bb4;
+  --border-color: rgba(255, 255, 255, 0.08);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  user-select: none;
+}
+
+body {
+  background: var(--bg-color);
+  color: var(--text-main);
+  min-height: 100vh;
+  padding: 12px;
+  display: flex;
+  justify-content: center;
+  transition: background 0.6s ease;
+}
+
+body.night-mode {
+  background: radial-gradient(circle at top, #1a0812 0%, #080205 100%);
+}
+
+body.day-mode {
+  background: radial-gradient(circle at top, #101c2e 0%, #070c14 100%);
+}
+
+.container {
+  width: 100%;
+  max-width: 480px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+header {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  padding: 14px 16px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  text-align: center;
+}
+
+.top-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.title {
+  font-size: 1.1rem;
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #fff;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.2);
+}
+
+.role-badge {
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.role-mafia { background: rgba(255, 51, 102, 0.2); border-color: var(--accent-red); color: var(--accent-red); }
+.role-doctor { background: rgba(0, 230, 153, 0.2); border-color: #00e699; color: #00e699; }
+.role-commissar { background: rgba(0, 210, 255, 0.2); border-color: var(--accent-blue); color: var(--accent-blue); }
+.role-citizen { background: rgba(255, 184, 0, 0.2); border-color: var(--accent-gold); color: var(--accent-gold); }
+
+.status-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border-color);
+}
+
+.timer {
+  font-size: 1.3rem;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent-blue);
+  text-shadow: 0 0 8px rgba(0, 210, 255, 0.4);
+}
+
+.timer.urgent {
+  color: var(--accent-red);
+  animation: pulse 1s infinite alternate;
+}
+
+@keyframes pulse {
+  from { transform: scale(1); }
+  to { transform: scale(1.08); text-shadow: 0 0 16px var(--accent-red); }
+}
+
+.card {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  padding: 12px 14px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+}
+
+.card h4 {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  letter-spacing: 0.8px;
+  margin-bottom: 10px;
+}
+
+.btn-group {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+button {
+  flex: 1;
+  background: #232738;
+  color: #fff;
+  border: 1px solid var(--border-color);
+  padding: 10px;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+button:active {
+  transform: scale(0.97);
+}
+
+button.primary {
+  background: linear-gradient(135deg, #ff3366, #ff6b8b);
+  border: none;
+  box-shadow: 0 4px 14px rgba(255, 51, 102, 0.3);
+}
+
+.players-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.player-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 8px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.85rem;
+}
+
+.player-card.dead {
+  opacity: 0.35;
+  filter: grayscale(1);
+  text-decoration: line-through;
+}
+
+.chat-box {
+  height: 180px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-right: 4px;
+  font-size: 0.85rem;
+}
+
+.chat-msg {
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  line-height: 1.3;
+}
+
+.chat-msg.system {
+  background: rgba(0, 210, 255, 0.08);
+  border-left: 3px solid var(--accent-blue);
+  color: #c9e9ff;
+  font-style: italic;
+}
+
+.chat-msg.mafia-secret {
+  background: rgba(255, 51, 102, 0.12);
+  border-left: 3px solid var(--accent-red);
+  color: #ffb8c7;
+}
+
+.chat-input-area {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.chat-input-area input {
+  flex: 1;
+  background: #141622;
+  border: 1px solid var(--border-color);
+  color: #fff;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  outline: none;
+}
+
+.chat-input-area input:focus {
+  border-color: var(--accent-blue);
+}
+
+.actions-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}

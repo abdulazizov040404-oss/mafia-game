@@ -1,6 +1,6 @@
 :root {
-  --bg-dark: #0a0c13;
-  --panel-bg: rgba(18, 22, 34, 0.95);
+  --bg-dark: #0a0c14;
+  --panel-bg: rgba(18, 22, 34, 0.96);
   --border: rgba(255, 255, 255, 0.08);
   --primary: #ff3366;
   --secondary: #00d2ff;
@@ -66,20 +66,6 @@ body.day-mode {
   text-transform: uppercase;
 }
 
-.btn-primary {
-  background: linear-gradient(135deg, #ff3366, #ff5e85);
-  color: #fff;
-  border: none;
-  font-weight: 700;
-}
-
-.btn-secondary {
-  background: linear-gradient(135deg, #00d2ff, #0099cc);
-  color: #fff;
-  border: none;
-  font-weight: 700;
-}
-
 button {
   background: #1f2538;
   color: #fff;
@@ -96,17 +82,29 @@ button:active {
   transform: scale(0.97);
 }
 
-.btn-sm {
-  padding: 6px 12px;
-  font-size: 0.8rem;
+.btn-primary {
+  background: linear-gradient(135deg, #ff3366, #ff5e85);
+  color: #fff;
+  border: none;
+  font-weight: 700;
+}
+
+.btn-secondary {
+  background: linear-gradient(135deg, #00d2ff, #0099cc);
+  color: #fff;
+  border: none;
+  font-weight: 700;
 }
 
 .btn-danger {
   background: rgba(255, 51, 102, 0.2);
   border-color: var(--primary);
   color: var(--primary);
-  padding: 4px 8px;
-  font-size: 0.75rem;
+}
+
+.btn-sm {
+  padding: 6px 12px;
+  font-size: 0.8rem;
 }
 
 .lobby-actions {
@@ -119,7 +117,7 @@ button:active {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  max-height: 320px;
+  max-height: 280px;
   overflow-y: auto;
 }
 
@@ -132,6 +130,30 @@ button:active {
   justify-content: space-between;
   align-items: center;
 }
+
+/* AVATARLAR VA RAMKALAR */
+.avatar-box {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.avatar-img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+}
+
+.frame-none { border: 2px solid var(--border); }
+.frame-bronze { border: 3px solid #cd7f32; box-shadow: 0 0 10px rgba(205, 127, 50, 0.6); }
+.frame-silver { border: 3px solid #c0c0c0; box-shadow: 0 0 10px rgba(192, 192, 192, 0.7); }
+.frame-gold { border: 3px solid #ffd700; box-shadow: 0 0 14px rgba(255, 215, 0, 0.8); }
+.frame-cyber { border: 3px solid var(--secondary); box-shadow: 0 0 16px var(--secondary); }
 
 .badge {
   padding: 4px 10px;
@@ -172,12 +194,6 @@ button:active {
   to { transform: scale(1.08); }
 }
 
-.time-selector {
-  display: flex;
-  gap: 6px;
-  margin: 8px 0;
-}
-
 .players-box {
   display: flex;
   flex-direction: column;
@@ -187,8 +203,8 @@ button:active {
 .player-item {
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 10px 12px;
+  border-radius: 12px;
+  padding: 8px 12px;
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -198,6 +214,12 @@ button:active {
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+.player-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .votes-sub-row {
@@ -215,13 +237,12 @@ button:active {
 }
 
 .chat-messages {
-  height: 200px;
+  height: 180px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 6px;
   font-size: 0.85rem;
-  padding-right: 4px;
 }
 
 .chat-bubble {
@@ -252,9 +273,8 @@ button:active {
   background: #121520;
   border: 1px solid var(--border);
   color: #fff;
-  padding: 10px 12px;
+  padding: 10px;
   border-radius: 10px;
-  font-size: 0.85rem;
   outline: none;
 }
 
@@ -277,13 +297,10 @@ button:active {
 
 .role-image-box {
   width: 100%;
-  height: 160px;
+  height: 180px;
   border-radius: 12px;
   overflow: hidden;
-  background: #0f1016;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  background: #000;
   border: 1px solid var(--border);
 }
 
@@ -328,4 +345,24 @@ button:active {
 .stat-label {
   font-size: 0.7rem;
   color: var(--text-muted);
+}
+
+.avatar-selector {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin: 10px 0;
+}
+
+.avatar-option {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid transparent;
+}
+
+.avatar-option.selected {
+  border-color: var(--secondary);
+  box-shadow: 0 0 10px var(--secondary);
 }

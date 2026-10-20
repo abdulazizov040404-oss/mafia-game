@@ -13,7 +13,15 @@
         <div id="lobby-view">
             <header class="panel">
                 <div class="top-bar">
-                    <span class="app-title">🎭 Mafia Cyber</span>
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <div id="header-avatar" class="avatar-box frame-none">
+                            <img id="header-avatar-img" class="avatar-img" src="" alt="avatar">
+                        </div>
+                        <div>
+                            <span class="app-title" id="header-user-name">...</span>
+                            <div style="font-size:0.75rem; color:var(--text-muted);" id="header-user-id">ID: #...</div>
+                        </div>
+                    </div>
                     <button class="btn-sm" onclick="showProfile()">👤 Profil</button>
                 </div>
             </header>
@@ -42,7 +50,10 @@
                         <span class="app-title" id="room-display-name">Xona</span>
                         <div id="room-display-id" style="font-size:0.75rem; color:var(--text-muted);">ID: #0000</div>
                     </div>
-                    <span id="player-role-badge" class="badge">Kuzatuvchi</span>
+                    <div style="display:flex; gap:6px; align-items:center;">
+                        <span id="player-role-badge" class="badge">Kuzatuvchi</span>
+                        <button class="btn-sm btn-danger" onclick="leaveRoom()">🚪 Chiqish</button>
+                    </div>
                 </div>
                 <div class="status-bar">
                     <span id="phase-title">Kutish zali</span>
@@ -53,29 +64,29 @@
             <!-- Xona egasi boshqaruvi -->
             <div id="host-panel" class="panel" style="display:none; margin-top: 10px;">
                 <h4 style="font-size:0.8rem; color:var(--text-muted);">KUNDUZGI MUHOKAMA VAQTI:</h4>
-                <div class="time-selector">
+                <div style="display:flex; gap:6px; margin: 8px 0;">
                     <button style="flex:1;" onclick="updateTimer(60)">1 Minut</button>
                     <button style="flex:1;" onclick="updateTimer(120)">2 Minut</button>
                     <button style="flex:1;" onclick="updateTimer(180)">3 Minut</button>
                 </div>
-                <button class="btn-primary" style="width: 100%; margin-top: 4px;" onclick="startGame()">O'YINNI BOSHLASH</button>
+                <button class="btn-primary" style="width: 100%;" onclick="startGame()">O'YINNI BOSHLASH</button>
             </div>
 
-            <!-- O'yinchilar va Ovozlar ro'yxati -->
+            <!-- O'yinchilar -->
             <div class="panel" style="margin-top: 10px;">
-                <h4 style="font-size:0.8rem; color:var(--text-muted); margin-bottom:8px;">O'YINCHILAR VA OVOZLAR:</h4>
+                <h4 style="font-size:0.8rem; color:var(--text-muted); margin-bottom:8px;">O'YINCHILAR:</h4>
                 <div id="players-list" class="players-box"></div>
             </div>
 
-            <!-- Amallar (Ovoz berish / Tun harakatlari) -->
+            <!-- Harakatlar oynasi -->
             <div id="actions-panel" class="panel" style="display:none; margin-top: 10px;">
                 <h4 id="action-title" style="font-size:0.8rem; color:var(--text-muted); margin-bottom:6px;">Tanlang:</h4>
                 <div id="action-buttons-box" style="display:flex; flex-direction:column; gap:6px;"></div>
             </div>
 
-            <!-- Saqlanib turuvchi Jonli Chat -->
+            <!-- Jonli Chat -->
             <div class="panel" style="margin-top: 10px;">
-                <h4 id="chat-status-label" style="font-size:0.8rem; color:var(--text-muted); margin-bottom:6px;">💬 JONLI CHAT (Tarix saqlanadi)</h4>
+                <h4 id="chat-status-label" style="font-size:0.8rem; color:var(--text-muted); margin-bottom:6px;">💬 JONLI CHAT</h4>
                 <div id="chat-messages" class="chat-messages"></div>
                 <div id="chat-form" class="chat-form">
                     <input type="text" id="chat-text-input" placeholder="Xabaringizni yozing..." maxlength="200" onkeydown="if(event.key==='Enter') submitChat()">
@@ -84,10 +95,10 @@
             </div>
         </div>
 
-        <!-- 3. ROL HAQIDA MA'LUMOT (MODAL BILAN RASM) -->
+        <!-- 3. ROL MA'LUMOTI MODALI -->
         <div id="role-modal" class="modal" style="display: none;">
             <div class="panel role-card-content">
-                <div id="role-image-box" class="role-image-box">
+                <div class="role-image-box">
                     <img id="role-image" src="" alt="Rol rasmi">
                 </div>
                 <h3 id="role-title" style="margin: 10px 0 6px 0; text-transform: uppercase;">Sizning Rolingiz</h3>
@@ -96,24 +107,27 @@
             </div>
         </div>
 
-        <!-- 4. XONA YARATISH MODALI -->
-        <div id="create-room-modal" class="modal" style="display: none;">
-            <div class="panel" style="width: 100%; max-width: 340px;">
-                <h3 style="margin-bottom: 10px;">Yangi xona yaratish</h3>
-                <input type="text" id="new-room-name-input" placeholder="Xona nomini kiriting..." maxlength="25" style="width:100%; padding:10px; border-radius:8px; border:1px solid var(--border); background:#121520; color:#fff; margin-bottom:12px; outline:none;">
-                <div style="display:flex; gap:8px;">
-                    <button style="flex:1;" onclick="closeCreateRoomModal()">Bekor qilish</button>
-                    <button class="btn-primary" style="flex:1;" onclick="confirmCreateRoom()">Yaratish</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- 5. PROFIL MODALI -->
+        <!-- 4. PROFIL MODALI (Ism, Avatar, Ramka, Foiz) -->
         <div id="profile-modal" class="modal" style="display: none;">
-            <div class="panel" style="width: 100%; max-width: 340px;">
+            <div class="panel" style="width: 100%; max-width: 360px;">
                 <h3 style="margin-bottom: 8px;">👤 Shaxsiy Profil</h3>
-                <p style="font-size:0.85rem; margin-bottom:4px;"><strong>Ism:</strong> <span id="user-name-display">...</span></p>
-                <p style="font-size:0.85rem; margin-bottom:8px;"><strong>ID:</strong> <span id="user-id-display">...</span></p>
+                <div style="display:flex; flex-direction:column; align-items:center; margin:10px 0;">
+                    <div id="prof-modal-avatar-box" class="avatar-box frame-none" style="width:64px; height:64px;">
+                        <img id="prof-modal-avatar-img" class="avatar-img" src="" alt="avatar">
+                    </div>
+                    <span id="prof-frame-name" style="font-size:0.75rem; color:var(--secondary); margin-top:4px;">Ramka: Standart</span>
+                </div>
+
+                <div style="margin-bottom:8px;">
+                    <label style="font-size:0.75rem; color:var(--text-muted);">Ism (kamida 6 ta harf):</label>
+                    <input type="text" id="prof-input-name" maxlength="15" style="width:100%; padding:8px; border-radius:8px; border:1px solid var(--border); background:#121520; color:#fff; outline:none;">
+                </div>
+
+                <div style="margin-bottom:8px;">
+                    <label style="font-size:0.75rem; color:var(--text-muted);">Avatar tanlang:</label>
+                    <div class="avatar-selector" id="avatar-options-box"></div>
+                </div>
+
                 <div class="stats-grid">
                     <div class="stat-item">
                         <div class="stat-num" id="stat-total-games">0</div>
@@ -125,10 +139,25 @@
                     </div>
                     <div class="stat-item">
                         <div class="stat-num" id="stat-win-rate">0%</div>
-                        <div class="stat-label">Yutuq foizi</div>
+                        <div class="stat-label">G'alaba %</div>
                     </div>
                 </div>
-                <button class="btn-primary" style="width:100%;" onclick="closeProfile()">Yopish</button>
+                <div style="display:flex; gap:8px;">
+                    <button style="flex:1;" onclick="closeProfile()">Bekor qilish</button>
+                    <button class="btn-primary" style="flex:1;" onclick="saveProfile()">Saqlash</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 5. XONA YARATISH MODALI -->
+        <div id="create-room-modal" class="modal" style="display: none;">
+            <div class="panel" style="width: 100%; max-width: 340px;">
+                <h3 style="margin-bottom: 10px;">Yangi xona yaratish</h3>
+                <input type="text" id="new-room-name-input" placeholder="Xona nomi..." maxlength="25" style="width:100%; padding:10px; border-radius:8px; border:1px solid var(--border); background:#121520; color:#fff; margin-bottom:12px; outline:none;">
+                <div style="display:flex; gap:8px;">
+                    <button style="flex:1;" onclick="closeCreateRoomModal()">Bekor qilish</button>
+                    <button class="btn-primary" style="flex:1;" onclick="confirmCreateRoom()">Yaratish</button>
+                </div>
             </div>
         </div>
     </div>

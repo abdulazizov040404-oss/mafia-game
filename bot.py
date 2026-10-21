@@ -1,4 +1,5 @@
 import os
+import html
 import asyncio
 import random
 from typing import Dict, List, Optional
@@ -6,6 +7,11 @@ from pydantic import BaseModel
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
+
+# Telegram bot kutubxonalari
+from aiogram import Bot, Dispatcher, types
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
+from aiogram.utils.exceptions import MessageNotModified, CantParseEntities
 
 app = FastAPI()
 
@@ -296,7 +302,6 @@ async def ws_handler(websocket: WebSocket, room_id: str, user_id: str, name: str
                     break
 
             elif act == "start_game" and room.phase == "lobby" and room.host_id == user_id:
-                # KAMIDA 4 KISHI BO'LISHI SHART
                 if len(room.players) < 4:
                     continue
 
@@ -367,9 +372,10 @@ async def ws_handler(websocket: WebSocket, room_id: str, user_id: str, name: str
                 del room.players[user_id]
             await broadcast(room, {"type": "players_update", "players": get_public_players(room)})
 
-            # --- TELEGRAM BOT VA MAJBURIY OBUNA (bot.py oxiriga qo'shing) ---
-from aiogram import Bot, Dispatcher, types
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
+
+# ==========================================
+# TELEGRAM BOT VA MAJBURIY OBUNA QISMI
+# ==========================================
 
 TG_BOT_TOKEN = "SIZNING_BOT_TOKENINGIZ"       # BotFather tokeni
 CHANNEL_ID = "@durbeh"
@@ -415,12 +421,12 @@ def get_check_keyboard():
     )
     return kb
 
-
-
 @tg_dp.message_handler(commands=['start'])
 async def start_handler(message: types.Message):
-    user_name = message.from_user.first_name[:6]
+    raw_name = message.from_user.first_name or "Foydalanuvchi"
+    user_name = html.escape(raw_name[:6])
     text = generate_welcome_text(user_name)
+    
     if await is_subscribed(message.from_user.id):
         await message.answer(text, reply_markup=get_main_keyboard(), parse_mode="HTML")
     else:
@@ -429,15 +435,20 @@ async def start_handler(message: types.Message):
 @tg_dp.callback_query_handler(lambda c: c.data == "check_sub")
 async def check_callback(callback_query: types.CallbackQuery):
     user_id = callback_query.from_user.id
-    user_name = callback_query.from_user.first_name[:6]
+    raw_name = callback_query.from_user.first_name or "Foydalanuvchi"
+    user_name = html.escape(raw_name[:6])
+
     if await is_subscribed(user_id):
         text = generate_welcome_text(user_name)
-        await callback_query.message.edit_text(text, reply_markup=get_main_keyboard(), parse_mode="HTML")
+        try:
+            await callback_query.message.edit_text(text, reply_markup=get_main_keyboard(), parse_mode="HTML")
+        except MessageNotModified:
+            pass
         await callback_query.answer("Obuna tasdiqlandi! O'yinni boshlashingiz mumkin 🎉")
     else:
         await callback_query.answer("❌ Siz hali kanalga a'zo bo'lmadingiz. Oldin @durbeh kanaliga obuna bo'ling!", show_alert=True)
 
-# FastAPI server bilan birga botni ishga tushirish
+# FastAPI ishga tushganda botni polling rejimida ishga tushirish
 @app.on_event("startup")
 async def on_startup():
     asyncio.create_task(tg_dp.start_polling())

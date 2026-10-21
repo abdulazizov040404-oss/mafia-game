@@ -1,4 +1,5 @@
 fastapi
 uvicorn[standard]
-python-telegram-bot
+pydantic
 websockets
+aiogram==2.25.1

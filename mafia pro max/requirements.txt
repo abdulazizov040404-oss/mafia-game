@@ -1,4 +1,5 @@
 fastapi
 uvicorn[standard]
 pydantic
+websockets
 aiogram>=2.25.1,<3.0.0

@@ -1,5 +1,4 @@
 import os
-import html
 import asyncio
 import random
 from typing import Dict, List, Optional
@@ -7,11 +6,8 @@ from pydantic import BaseModel
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
-
-# Telegram bot kutubxonalari
 from aiogram import Bot, Dispatcher, types
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
-from aiogram.utils.exceptions import MessageNotModified, CantParseEntities
 
 app = FastAPI()
 
@@ -377,15 +373,25 @@ async def ws_handler(websocket: WebSocket, room_id: str, user_id: str, name: str
 # TELEGRAM BOT VA MAJBURIY OBUNA QISMI
 # ==========================================
 
-TG_BOT_TOKEN = "SIZNING_BOT_TOKENINGIZ"       # BotFather tokeni
+# O'ZINGIZNING HAQIQIY MA'LUMOTLARINGIZNI YOZING:
+TG_BOT_TOKEN = "SIZNING_BOT_TOKENINGIZ"  # <-- BotFather bergan haqiqiy token (masalan: 7123456789:AAH...)
 CHANNEL_ID = "@durbeh"
 CHANNEL_URL = "https://t.me/durbeh"
-WEB_APP_URL = "https://SIZNING_RENDER_URL.onrender.com"  # Render havolangiz
+WEB_APP_URL = "https://SIZNING_RENDER_URL.onrender.com"  # <-- Render havolangiz
 
-tg_bot = Bot(token=TG_BOT_TOKEN)
-tg_dp = Dispatcher(tg_bot)
+tg_bot = None
+tg_dp = None
+
+if TG_BOT_TOKEN and TG_BOT_TOKEN != "SIZNING_BOT_TOKENINGIZ":
+    try:
+        tg_bot = Bot(token=TG_BOT_TOKEN)
+        tg_dp = Dispatcher(tg_bot)
+    except Exception as e:
+        print(f"Botni ishga tushirishda xatolik: {e}")
 
 async def is_subscribed(user_id: int) -> bool:
+    if not tg_bot:
+        return True
     try:
         member = await tg_bot.get_chat_member(chat_id=CHANNEL_ID, user_id=user_id)
         return member.status in ["member", "administrator", "creator"]
@@ -421,34 +427,28 @@ def get_check_keyboard():
     )
     return kb
 
-@tg_dp.message_handler(commands=['start'])
-async def start_handler(message: types.Message):
-    raw_name = message.from_user.first_name or "Foydalanuvchi"
-    user_name = html.escape(raw_name[:6])
-    text = generate_welcome_text(user_name)
-    
-    if await is_subscribed(message.from_user.id):
-        await message.answer(text, reply_markup=get_main_keyboard(), parse_mode="HTML")
-    else:
-        await message.answer(text, reply_markup=get_check_keyboard(), parse_mode="HTML")
-
-@tg_dp.callback_query_handler(lambda c: c.data == "check_sub")
-async def check_callback(callback_query: types.CallbackQuery):
-    user_id = callback_query.from_user.id
-    raw_name = callback_query.from_user.first_name or "Foydalanuvchi"
-    user_name = html.escape(raw_name[:6])
-
-    if await is_subscribed(user_id):
+if tg_dp:
+    @tg_dp.message_handler(commands=['start'])
+    async def start_handler(message: types.Message):
+        user_name = message.from_user.first_name[:6]
         text = generate_welcome_text(user_name)
-        try:
-            await callback_query.message.edit_text(text, reply_markup=get_main_keyboard(), parse_mode="HTML")
-        except MessageNotModified:
-            pass
-        await callback_query.answer("Obuna tasdiqlandi! O'yinni boshlashingiz mumkin 🎉")
-    else:
-        await callback_query.answer("❌ Siz hali kanalga a'zo bo'lmadingiz. Oldin @durbeh kanaliga obuna bo'ling!", show_alert=True)
+        if await is_subscribed(message.from_user.id):
+            await message.answer(text, reply_markup=get_main_keyboard(), parse_mode="HTML")
+        else:
+            await message.answer(text, reply_markup=get_check_keyboard(), parse_mode="HTML")
 
-# FastAPI ishga tushganda botni polling rejimida ishga tushirish
+    @tg_dp.callback_query_handler(lambda c: c.data == "check_sub")
+    async def check_callback(callback_query: types.CallbackQuery):
+        user_id = callback_query.from_user.id
+        user_name = callback_query.from_user.first_name[:6]
+        if await is_subscribed(user_id):
+            text = generate_welcome_text(user_name)
+            await callback_query.message.edit_text(text, reply_markup=get_main_keyboard(), parse_mode="HTML")
+            await callback_query.answer("Obuna tasdiqlandi! O'yinni boshlashingiz mumkin 🎉")
+        else:
+            await callback_query.answer("❌ Siz hali kanalga a'zo bo'lmadingiz. Oldin @durbeh kanaliga obuna bo'ling!", show_alert=True)
+
 @app.on_event("startup")
 async def on_startup():
-    asyncio.create_task(tg_dp.start_polling())
+    if tg_dp:
+        asyncio.create_task(tg_dp.start_polling())

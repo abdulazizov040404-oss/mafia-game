@@ -366,3 +366,78 @@ async def ws_handler(websocket: WebSocket, room_id: str, user_id: str, name: str
             if user_id in room.players:
                 del room.players[user_id]
             await broadcast(room, {"type": "players_update", "players": get_public_players(room)})
+
+            # --- TELEGRAM BOT VA MAJBURIY OBUNA (bot.py oxiriga qo'shing) ---
+from aiogram import Bot, Dispatcher, types
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
+
+TG_BOT_TOKEN = "SIZNING_BOT_TOKENINGIZ"       # BotFather tokeni
+CHANNEL_ID = "@durbeh"
+CHANNEL_URL = "https://t.me/durbeh"
+WEB_APP_URL = "https://SIZNING_RENDER_URL.onrender.com"  # Render havolangiz
+
+tg_bot = Bot(token=TG_BOT_TOKEN)
+tg_dp = Dispatcher(tg_bot)
+
+async def is_subscribed(user_id: int) -> bool:
+    try:
+        member = await tg_bot.get_chat_member(chat_id=CHANNEL_ID, user_id=user_id)
+        return member.status in ["member", "administrator", "creator"]
+    except Exception:
+        return False
+
+def generate_welcome_text(user_name: str) -> str:
+    return (
+        f"🎭 <b>Mafia Cyber</b> olamiga xush kelibsiz, <b>{user_name}</b>!\n\n"
+        "🌙 Kechasi mafialar nishonni kelishadi, ☀️ kunduzi shahar ahli jinoyatchini qidiradi.\n"
+        "👥 4–16 o'yinchi · 🕵️ Maxfiy rollar · 🗳 Ovoz berish · 🎤 Oxirgi so'z\n\n"
+        "⚡️ Xona yarating yoki «Tezkor qo'shilish» orqali jangga kiring!\n"
+        "🏆 O'ynang, g'alaba qozoning va profilingiz uchun yangi ramkalarni oching.\n\n"
+        "▶️ O'yinga kirish uchun quyidagi tugmani bosing!\n\n"
+        "👥 Do'stlaringizni taklif qiling va guruhimizda birgalikda o'ynang!\n\n"
+        f"📢 Yangiliklar va rasmiy kanal: {CHANNEL_ID}\n\n"
+        "👉 <i>Yagona kanalga qo'shiling va o'yinni boshlang!</i>"
+    )
+
+def get_main_keyboard():
+    kb = InlineKeyboardMarkup(row_width=1)
+    kb.add(
+        InlineKeyboardButton("🎮 O'yinni boshlash (Mini App)", web_app=WebAppInfo(url=WEB_APP_URL)),
+        InlineKeyboardButton("📢 Rasmiy kanal (@durbeh)", url=CHANNEL_URL)
+    )
+    return kb
+
+def get_check_keyboard():
+    kb = InlineKeyboardMarkup(row_width=1)
+    kb.add(
+        InlineKeyboardButton("➕ Kanalga obuna bo'lish", url=CHANNEL_URL),
+        InlineKeyboardButton("✅ Obunani tekshirish", callback_data="check_sub")
+    )
+    return kb
+
+
+
+@tg_dp.message_handler(commands=['start'])
+async def start_handler(message: types.Message):
+    user_name = message.from_user.first_name[:6]
+    text = generate_welcome_text(user_name)
+    if await is_subscribed(message.from_user.id):
+        await message.answer(text, reply_markup=get_main_keyboard(), parse_mode="HTML")
+    else:
+        await message.answer(text, reply_markup=get_check_keyboard(), parse_mode="HTML")
+
+@tg_dp.callback_query_handler(lambda c: c.data == "check_sub")
+async def check_callback(callback_query: types.CallbackQuery):
+    user_id = callback_query.from_user.id
+    user_name = callback_query.from_user.first_name[:6]
+    if await is_subscribed(user_id):
+        text = generate_welcome_text(user_name)
+        await callback_query.message.edit_text(text, reply_markup=get_main_keyboard(), parse_mode="HTML")
+        await callback_query.answer("Obuna tasdiqlandi! O'yinni boshlashingiz mumkin 🎉")
+    else:
+        await callback_query.answer("❌ Siz hali kanalga a'zo bo'lmadingiz. Oldin @durbeh kanaliga obuna bo'ling!", show_alert=True)
+
+# FastAPI server bilan birga botni ishga tushirish
+@app.on_event("startup")
+async def on_startup():
+    asyncio.create_task(tg_dp.start_polling())

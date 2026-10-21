@@ -6,8 +6,7 @@ from pydantic import BaseModel
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
-from aiogram import Bot, Dispatcher, types
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
+import httpx
 
 app = FastAPI()
 
@@ -369,34 +368,14 @@ async def ws_handler(websocket: WebSocket, room_id: str, user_id: str, name: str
             await broadcast(room, {"type": "players_update", "players": get_public_players(room)})
 
 
-# ==========================================
-# TELEGRAM BOT VA MAJBURIY OBUNA QISMI
-# ==========================================
+# ==========================================================
+# TELEGRAM BOT VA MAJBURIY OBUNA (Python 3.14 ga 100% mos)
+# ==========================================================
 
-# O'ZINGIZNING HAQIQIY MA'LUMOTLARINGIZNI YOZING:
-TG_BOT_TOKEN = "SIZNING_BOT_TOKENINGIZ"  # <-- BotFather bergan haqiqiy token (masalan: 7123456789:AAH...)
+TG_BOT_TOKEN = "SIZNING_BOT_TOKENINGIZ"  # <-- BotFather'dan olingan tokenni qo'ying
 CHANNEL_ID = "@durbeh"
 CHANNEL_URL = "https://t.me/durbeh"
-WEB_APP_URL = "https://SIZNING_RENDER_URL.onrender.com"  # <-- Render havolangiz
-
-tg_bot = None
-tg_dp = None
-
-if TG_BOT_TOKEN and TG_BOT_TOKEN != "SIZNING_BOT_TOKENINGIZ":
-    try:
-        tg_bot = Bot(token=TG_BOT_TOKEN)
-        tg_dp = Dispatcher(tg_bot)
-    except Exception as e:
-        print(f"Botni ishga tushirishda xatolik: {e}")
-
-async def is_subscribed(user_id: int) -> bool:
-    if not tg_bot:
-        return True
-    try:
-        member = await tg_bot.get_chat_member(chat_id=CHANNEL_ID, user_id=user_id)
-        return member.status in ["member", "administrator", "creator"]
-    except Exception:
-        return False
+WEB_APP_URL = "https://SIZNING_RENDER_URL.onrender.com"  # <-- Render saytingiz havolasi
 
 def generate_welcome_text(user_name: str) -> str:
     return (
@@ -411,44 +390,106 @@ def generate_welcome_text(user_name: str) -> str:
         "👉 <i>Yagona kanalga qo'shiling va o'yinni boshlang!</i>"
     )
 
-def get_main_keyboard():
-    kb = InlineKeyboardMarkup(row_width=1)
-    kb.add(
-        InlineKeyboardButton("🎮 O'yinni boshlash (Mini App)", web_app=WebAppInfo(url=WEB_APP_URL)),
-        InlineKeyboardButton("📢 Rasmiy kanal (@durbeh)", url=CHANNEL_URL)
-    )
-    return kb
+async def check_telegram_subscription(client: httpx.AsyncClient, user_id: int) -> bool:
+    try:
+        url = f"https://api.telegram.org/bot{TG_BOT_TOKEN}/getChatMember"
+        resp = await client.get(url, params={"chat_id": CHANNEL_ID, "user_id": user_id})
+        data = resp.json()
+        if data.get("ok"):
+            status = data.get("result", {}).get("status")
+            return status in ["member", "administrator", "creator"]
+    except Exception:
+        pass
+    return False
 
-def get_check_keyboard():
-    kb = InlineKeyboardMarkup(row_width=1)
-    kb.add(
-        InlineKeyboardButton("➕ Kanalga obuna bo'lish", url=CHANNEL_URL),
-        InlineKeyboardButton("✅ Obunani tekshirish", callback_data="check_sub")
-    )
-    return kb
+async def run_telegram_bot_loop():
+    if not TG_BOT_TOKEN or TG_BOT_TOKEN == "SIZNING_BOT_TOKENINGIZ":
+        return
 
-if tg_dp:
-    @tg_dp.message_handler(commands=['start'])
-    async def start_handler(message: types.Message):
-        user_name = message.from_user.first_name[:6]
-        text = generate_welcome_text(user_name)
-        if await is_subscribed(message.from_user.id):
-            await message.answer(text, reply_markup=get_main_keyboard(), parse_mode="HTML")
-        else:
-            await message.answer(text, reply_markup=get_check_keyboard(), parse_mode="HTML")
+    offset = 0
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        while True:
+            try:
+                url = f"https://api.telegram.org/bot{TG_BOT_TOKEN}/getUpdates"
+                resp = await client.get(url, params={"offset": offset, "timeout": 20})
+                data = resp.json()
 
-    @tg_dp.callback_query_handler(lambda c: c.data == "check_sub")
-    async def check_callback(callback_query: types.CallbackQuery):
-        user_id = callback_query.from_user.id
-        user_name = callback_query.from_user.first_name[:6]
-        if await is_subscribed(user_id):
-            text = generate_welcome_text(user_name)
-            await callback_query.message.edit_text(text, reply_markup=get_main_keyboard(), parse_mode="HTML")
-            await callback_query.answer("Obuna tasdiqlandi! O'yinni boshlashingiz mumkin 🎉")
-        else:
-            await callback_query.answer("❌ Siz hali kanalga a'zo bo'lmadingiz. Oldin @durbeh kanaliga obuna bo'ling!", show_alert=True)
+                if not data.get("ok"):
+                    await asyncio.sleep(3)
+                    continue
+
+                for update in data.get("result", []):
+                    offset = update["update_id"] + 1
+
+                    # 1. /start xabari
+                    if "message" in update and "text" in update["message"]:
+                        msg = update["message"]
+                        if msg.get("text", "").startswith("/start"):
+                            user_id = msg["from"]["id"]
+                            user_name = msg["from"].get("first_name", "O'yinchi")[:6]
+
+                            is_sub = await check_telegram_subscription(client, user_id)
+                            welcome_txt = generate_welcome_text(user_name)
+
+                            if is_sub:
+                                markup = {
+                                    "inline_keyboard": [
+                                        [{"text": "🎮 O'yinni boshlash (Mini App)", "web_app": {"url": WEB_APP_URL}}],
+                                        [{"text": "📢 Rasmiy kanal (@durbeh)", "url": CHANNEL_URL}]
+                                    ]
+                                }
+                            else:
+                                markup = {
+                                    "inline_keyboard": [
+                                        [{"text": "➕ Kanalga obuna bo'lish", "url": CHANNEL_URL}],
+                                        [{"text": "✅ Obunani tekshirish", "callback_data": "check_sub"}]
+                                    ]
+                                }
+
+                            send_url = f"https://api.telegram.org/bot{TG_BOT_TOKEN}/sendMessage"
+                            await client.post(send_url, json={
+                                "chat_id": user_id,
+                                "text": welcome_txt,
+                                "parse_mode": "HTML",
+                                "reply_markup": markup
+                            })
+
+                    # 2. "Obunani tekshirish" tugmasi (Callback)
+                    elif "callback_query" in update:
+                        cb = update["callback_query"]
+                        if cb.get("data") == "check_sub":
+                            user_id = cb["from"]["id"]
+                            user_name = cb["from"].get("first_name", "O'yinchi")[:6]
+                            msg_id = cb["message"]["message_id"]
+
+                            is_sub = await check_telegram_subscription(client, user_id)
+
+                            if is_sub:
+                                welcome_txt = generate_welcome_text(user_name)
+                                markup = {
+                                    "inline_keyboard": [
+                                        [{"text": "🎮 O'yinni boshlash (Mini App)", "web_app": {"url": WEB_APP_URL}}],
+                                        [{"text": "📢 Rasmiy kanal (@durbeh)", "url": CHANNEL_URL}]
+                                    ]
+                                }
+                                edit_url = f"https://api.telegram.org/bot{TG_BOT_TOKEN}/editMessageText"
+                                await client.post(edit_url, json={
+                                    "chat_id": user_id,
+                                    "message_id": msg_id,
+                                    "text": welcome_txt,
+                                    "parse_mode": "HTML",
+                                    "reply_markup": markup
+                                })
+                            else:
+                                alert_url = f"https://api.telegram.org/bot{TG_BOT_TOKEN}/answerCallbackQuery"
+                                await client.post(alert_url, json={
+                                    "callback_query_id": cb["id"],
+                                    "text": "❌ Siz hali kanalga a'zo bo'lmadingiz. Oldin @durbeh kanaliga obuna bo'ling!",
+                                    "show_alert": True
+                                })
+            except Exception:
+                await asyncio.sleep(2)
 
 @app.on_event("startup")
-async def on_startup():
-    if tg_dp:
-        asyncio.create_task(tg_dp.start_polling())
+async def startup_event():
+    asyncio.create_task(run_telegram_bot_loop())

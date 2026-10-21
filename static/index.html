@@ -7,157 +7,160 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <link rel="stylesheet" href="/static/style.css">
 </head>
-<body class="day-mode">
+<body>
     <div class="app-wrapper">
-        <!-- 1. LOBBY SAHIFASI -->
-        <div id="lobby-view">
-            <header class="panel">
-                <div class="top-bar">
-                    <div style="display:flex; align-items:center; gap:10px;">
-                        <div id="header-avatar" class="avatar-box frame-none">
-                            <img id="header-avatar-img" class="avatar-img" src="" alt="avatar">
-                        </div>
-                        <div>
-                            <span class="app-title" id="header-user-name">...</span>
-                            <div style="font-size:0.75rem; color:var(--text-muted);" id="header-user-id">ID: #...</div>
-                        </div>
-                    </div>
-                    <button class="btn-sm" onclick="showProfile()">👤 Profil</button>
-                </div>
+        <!-- 1. BOSH MENYU -->
+        <div id="screen-home">
+            <header class="main-header">
+                <button class="gold-icon-btn" onclick="toggleTheme()" id="theme-toggle-btn" title="Rejim">🌓</button>
+                <div class="pro-banner-title">MAFIA CLUB</div>
+                <button class="gold-icon-btn" onclick="openProfile(false)">👤</button>
             </header>
 
-            <div class="panel" style="margin-top: 12px;">
-                <div class="lobby-actions">
-                    <button class="btn-secondary" style="flex:1;" onclick="quickJoin()">⚡ Tezkor qo'shilish</button>
-                    <button class="btn-primary" style="flex:1;" onclick="openCreateRoomModal()">+ Yangi xona</button>
+            <div class="gold-icons-bar">
+                <div class="gold-icon-btn" onclick="openProfile(false)">☀️</div>
+                <div class="gold-icon-btn" onclick="openProfile(false)">⏳</div>
+                <div class="gold-icon-btn" onclick="openProfile(false)">📖</div>
+                <div class="gold-icon-btn" onclick="openProfile(false)">🏆</div>
+                <div class="gold-icon-btn" onclick="openProfile(false)">⛺</div>
+            </div>
+
+            <div class="hero-action-row">
+                <button class="btn-square-gold" onclick="openCreateRoomModal()">+</button>
+                <button class="btn-quick-join" onclick="quickJoin()">⚡ Tezkor qo'shilish</button>
+                <button class="btn-square-gold" onclick="refreshRooms()">⟳</button>
+            </div>
+
+            <div class="streak-card">
+                <span>🔥 7 kunlik seriya</span>
+                <strong style="color:var(--accent-gold);">Bugun: Faol</strong>
+            </div>
+
+            <div class="rooms-section-header">
+                <span>👥 OCHIQ XONALAR</span>
+                <span id="active-rooms-count">0 ta xona</span>
+            </div>
+
+            <div id="rooms-list" class="rooms-list-container">
+                <!-- Xonalar -->
+            </div>
+        </div>
+
+        <!-- 2. O'YIN VA CHAT ZALI -->
+        <div id="screen-game" class="game-screen" style="display: none;">
+            <div class="game-top-nav">
+                <button class="gold-icon-btn" style="width:36px; height:36px; font-size:1rem;" onclick="leaveRoom()">←</button>
+                <div class="game-top-center">
+                    <div id="in-game-room-name" class="game-room-name">Xona nomi</div>
+                    <div id="in-game-room-stats" class="game-players-count-sub">0/16 o'yinchi</div>
+                </div>
+                <!-- Kamida 4 kishi bo'lgandagina chiqadigan boshlash tugmasi -->
+                <button id="host-start-btn" style="display:none; background:var(--accent-green); border:none; color:#fff; border-radius:12px; padding:6px 12px; font-size:0.75rem; font-weight:700;" onclick="startGame()">Boshlash</button>
+                <span id="players-wait-hint" style="display:none; font-size:0.68rem; color:var(--text-sub);">Kutilmoqda...</span>
+            </div>
+
+            <!-- O'YINCHILARNING DUMALOQ AVATARLARI QATORI -->
+            <div id="players-horizontal" class="players-horizontal-panel"></div>
+
+            <!-- BOSQICH VA TAYMER -->
+            <div style="background:var(--card-bg); padding:6px 14px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-color); font-size:0.8rem;">
+                <span id="phase-badge" style="font-weight:700; color:var(--accent-gold);">Kutish zali</span>
+                <span id="game-timer" style="font-weight:900; color:var(--accent-blue);">01:00</span>
+            </div>
+
+            <!-- AMALLAR PANELI -->
+            <div id="action-panel" style="display:none; background:var(--panel-bg); padding:10px; border-bottom:1px solid var(--border-color);">
+                <div id="action-title" style="font-size:0.78rem; color:var(--text-sub); margin-bottom:6px;">Tanlang:</div>
+                <div id="action-buttons-box" style="display:flex; flex-wrap:wrap; gap:6px;"></div>
+            </div>
+
+            <!-- TELEGRAM CHAT -->
+            <div id="chat-messages" class="telegram-chat-area"></div>
+
+            <!-- CHAT INPUT -->
+            <div class="chat-bottom-input-bar">
+                <input type="text" id="chat-input" class="chat-input-modern" placeholder="Xabaringizni yozing..." maxlength="200" onkeydown="if(event.key==='Enter') sendChat()">
+                <button class="chat-send-round-btn" onclick="sendChat()">➤</button>
+            </div>
+        </div>
+
+        <!-- 3. PROFIL / BIRINCHI KIRGANDAGI MODAL -->
+        <div id="modal-profile" class="modal-overlay" style="display: none;">
+            <div class="modal-content-panel">
+                <h3 id="prof-modal-title" style="margin-bottom: 10px; font-size:1.1rem; text-align:center;">👤 Profilingizni sozlang</h3>
+                
+                <div style="display:flex; flex-direction:column; align-items:center; margin-bottom:10px;">
+                    <img id="prof-preview-avatar" src="" style="width:68px; height:68px; border-radius:50%; object-fit:cover; border:2px solid var(--accent-gold); margin-bottom:6px;">
+                    <label for="avatar-file-input" style="font-size:0.75rem; color:var(--accent-blue); cursor:pointer; font-weight:700; background:var(--card-bg); padding:4px 10px; border-radius:12px; border:1px solid var(--border-color);">
+                        📁 Fayldan yuklash
+                    </label>
+                    <input type="file" id="avatar-file-input" accept="image/*" style="display:none;" onchange="handleFileUpload(event)">
                 </div>
 
-                <div class="top-bar" style="margin: 10px 0 6px 0;">
-                    <h4 style="font-size:0.85rem; color:var(--text-muted);">FAOL XONALAR</h4>
-                    <button class="btn-sm" onclick="refreshRooms()">Yangilash</button>
+                <div class="input-field-block">
+                    <label>Ismingiz (maksimal 6 ta harf):</label>
+                    <input type="text" id="prof-input-name" class="input-modern" maxlength="6" placeholder="Masalan: Jasur">
                 </div>
-                <div id="rooms-container" class="rooms-container">
-                    <p style="text-align:center; color:var(--text-muted); padding:20px 0;">Faol xonalar topilmadi.</p>
+
+                <div class="input-field-block">
+                    <label>Yoki tayyor avatardan tanlang:</label>
+                    <div id="avatar-presets-box" style="display:flex; gap:8px; justify-content:center; overflow-x:auto; padding:4px 0;"></div>
+                </div>
+
+                <!-- STATISTIKA (MAFIA FOIZI BILAN) -->
+                <div id="prof-stats-container" style="display:grid; grid-template-columns: repeat(4, 1fr); gap:6px; margin:10px 0; text-align:center;">
+                    <div style="background:var(--card-bg); padding:8px 4px; border-radius:10px;">
+                        <div id="prof-games" style="font-weight:800; color:var(--accent-blue);">0</div>
+                        <div style="font-size:0.65rem; color:var(--text-sub);">O'yinlar</div>
+                    </div>
+                    <div style="background:var(--card-bg); padding:8px 4px; border-radius:10px;">
+                        <div id="prof-wins" style="font-weight:800; color:var(--accent-green);">0</div>
+                        <div style="font-size:0.65rem; color:var(--text-sub);">G'alaba</div>
+                    </div>
+                    <div style="background:var(--card-bg); padding:8px 4px; border-radius:10px;">
+                        <div id="prof-rate" style="font-weight:800; color:var(--accent-gold);">0%</div>
+                        <div style="font-size:0.65rem; color:var(--text-sub);">Yutuq %</div>
+                    </div>
+                    <div style="background:var(--card-bg); padding:8px 4px; border-radius:10px;">
+                        <div id="prof-mafia-rate" style="font-weight:800; color:var(--accent-red);">0%</div>
+                        <div style="font-size:0.65rem; color:var(--text-sub);">Mafia %</div>
+                    </div>
+                </div>
+
+                <button class="btn-quick-join" style="width:100%; height:42px; margin-top:8px;" onclick="saveProfile()">Saqlash va davom etish</button>
+            </div>
+        </div>
+
+        <!-- 4. XONA YARATISH MODALI -->
+        <div id="modal-create-room" class="modal-overlay" style="display: none;">
+            <div class="modal-content-panel">
+                <h3 style="margin-bottom: 12px; font-size:1.1rem;">Yangi xona yaratish</h3>
+                <div class="input-field-block">
+                    <label>Xona nomi:</label>
+                    <input type="text" id="cr-room-name" class="input-modern" placeholder="Masalan: Bordo xona" maxlength="25">
+                </div>
+                <div class="input-field-block">
+                    <label>Muhokama vaqti:</label>
+                    <div class="time-tabs">
+                        <button class="time-tab-btn active" id="tab-60" onclick="selectTime(60)">1 daq</button>
+                        <button class="time-tab-btn" id="tab-120" onclick="selectTime(120)">2 daq</button>
+                        <button class="time-tab-btn" id="tab-180" onclick="selectTime(180)">3 daq</button>
+                    </div>
+                </div>
+                <div style="display:flex; gap:8px; margin-top:16px;">
+                    <button class="time-tab-btn" onclick="closeCreateRoomModal()">Bekor qilish</button>
+                    <button class="btn-quick-join" style="flex:1; height:40px;" onclick="confirmCreateRoom()">Yaratish</button>
                 </div>
             </div>
         </div>
 
-        <!-- 2. O'YIN XONASI -->
-        <div id="game-view" style="display: none;">
-            <header class="panel">
-                <div class="top-bar">
-                    <div>
-                        <span class="app-title" id="room-display-name">Xona</span>
-                        <div id="room-display-id" style="font-size:0.75rem; color:var(--text-muted);">ID: #0000</div>
-                    </div>
-                    <div style="display:flex; gap:6px; align-items:center;">
-                        <span id="player-role-badge" class="badge">Kuzatuvchi</span>
-                        <button class="btn-sm btn-danger" onclick="leaveRoom()">🚪 Chiqish</button>
-                    </div>
-                </div>
-                <div class="status-bar">
-                    <span id="phase-title">Kutish zali</span>
-                    <span id="timer-display" class="timer">01:00</span>
-                </div>
-            </header>
-
-            <!-- Xona egasi boshqaruvi -->
-            <div id="host-panel" class="panel" style="display:none; margin-top: 10px;">
-                <h4 style="font-size:0.8rem; color:var(--text-muted);">KUNDUZGI MUHOKAMA VAQTI:</h4>
-                <div style="display:flex; gap:6px; margin: 8px 0;">
-                    <button style="flex:1;" onclick="updateTimer(60)">1 Minut</button>
-                    <button style="flex:1;" onclick="updateTimer(120)">2 Minut</button>
-                    <button style="flex:1;" onclick="updateTimer(180)">3 Minut</button>
-                </div>
-                <button class="btn-primary" style="width: 100%;" onclick="startGame()">O'YINNI BOSHLASH</button>
-            </div>
-
-            <!-- O'yinchilar -->
-            <div class="panel" style="margin-top: 10px;">
-                <h4 style="font-size:0.8rem; color:var(--text-muted); margin-bottom:8px;">O'YINCHILAR:</h4>
-                <div id="players-list" class="players-box"></div>
-            </div>
-
-            <!-- Harakatlar oynasi -->
-            <div id="actions-panel" class="panel" style="display:none; margin-top: 10px;">
-                <h4 id="action-title" style="font-size:0.8rem; color:var(--text-muted); margin-bottom:6px;">Tanlang:</h4>
-                <div id="action-buttons-box" style="display:flex; flex-direction:column; gap:6px;"></div>
-            </div>
-
-            <!-- Jonli Chat -->
-            <div class="panel" style="margin-top: 10px;">
-                <h4 id="chat-status-label" style="font-size:0.8rem; color:var(--text-muted); margin-bottom:6px;">💬 JONLI CHAT</h4>
-                <div id="chat-messages" class="chat-messages"></div>
-                <div id="chat-form" class="chat-form">
-                    <input type="text" id="chat-text-input" placeholder="Xabaringizni yozing..." maxlength="200" onkeydown="if(event.key==='Enter') submitChat()">
-                    <button class="btn-secondary" onclick="submitChat()">Yuborish</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- 3. ROL MA'LUMOTI MODALI -->
-        <div id="role-modal" class="modal" style="display: none;">
-            <div class="panel role-card-content">
-                <div class="role-image-box">
-                    <img id="role-image" src="" alt="Rol rasmi">
-                </div>
-                <h3 id="role-title" style="margin: 10px 0 6px 0; text-transform: uppercase;">Sizning Rolingiz</h3>
-                <p id="role-desc" class="role-desc"></p>
-                <button class="btn-primary" style="width:100%; margin-top:14px;" onclick="closeRoleModal()">Tushundim</button>
-            </div>
-        </div>
-
-        <!-- 4. PROFIL MODALI (Ism, Avatar, Ramka, Foiz) -->
-        <div id="profile-modal" class="modal" style="display: none;">
-            <div class="panel" style="width: 100%; max-width: 360px;">
-                <h3 style="margin-bottom: 8px;">👤 Shaxsiy Profil</h3>
-                <div style="display:flex; flex-direction:column; align-items:center; margin:10px 0;">
-                    <div id="prof-modal-avatar-box" class="avatar-box frame-none" style="width:64px; height:64px;">
-                        <img id="prof-modal-avatar-img" class="avatar-img" src="" alt="avatar">
-                    </div>
-                    <span id="prof-frame-name" style="font-size:0.75rem; color:var(--secondary); margin-top:4px;">Ramka: Standart</span>
-                </div>
-
-                <div style="margin-bottom:8px;">
-                    <label style="font-size:0.75rem; color:var(--text-muted);">Ism (kamida 6 ta harf):</label>
-                    <input type="text" id="prof-input-name" maxlength="15" style="width:100%; padding:8px; border-radius:8px; border:1px solid var(--border); background:#121520; color:#fff; outline:none;">
-                </div>
-
-                <div style="margin-bottom:8px;">
-                    <label style="font-size:0.75rem; color:var(--text-muted);">Avatar tanlang:</label>
-                    <div class="avatar-selector" id="avatar-options-box"></div>
-                </div>
-
-                <div class="stats-grid">
-                    <div class="stat-item">
-                        <div class="stat-num" id="stat-total-games">0</div>
-                        <div class="stat-label">O'yinlar</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-num" id="stat-total-wins">0</div>
-                        <div class="stat-label">G'alabalar</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-num" id="stat-win-rate">0%</div>
-                        <div class="stat-label">G'alaba %</div>
-                    </div>
-                </div>
-                <div style="display:flex; gap:8px;">
-                    <button style="flex:1;" onclick="closeProfile()">Bekor qilish</button>
-                    <button class="btn-primary" style="flex:1;" onclick="saveProfile()">Saqlash</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- 5. XONA YARATISH MODALI -->
-        <div id="create-room-modal" class="modal" style="display: none;">
-            <div class="panel" style="width: 100%; max-width: 340px;">
-                <h3 style="margin-bottom: 10px;">Yangi xona yaratish</h3>
-                <input type="text" id="new-room-name-input" placeholder="Xona nomi..." maxlength="25" style="width:100%; padding:10px; border-radius:8px; border:1px solid var(--border); background:#121520; color:#fff; margin-bottom:12px; outline:none;">
-                <div style="display:flex; gap:8px;">
-                    <button style="flex:1;" onclick="closeCreateRoomModal()">Bekor qilish</button>
-                    <button class="btn-primary" style="flex:1;" onclick="confirmCreateRoom()">Yaratish</button>
-                </div>
+        <!-- 5. ROL MODALI -->
+        <div id="modal-role" class="modal-overlay" style="display: none;">
+            <div class="modal-content-panel" style="text-align:center;">
+                <img id="role-img-card" src="" style="width:100%; height:180px; object-fit:cover; border-radius:14px; margin-bottom:8px;" alt="Rol">
+                <h3 id="role-title-card" style="font-size:1.1rem; color:var(--accent-gold);">ROL</h3>
+                <p id="role-desc-card" style="font-size:0.8rem; color:var(--text-sub); margin:8px 0 14px; text-align:left; line-height:1.4;"></p>
+                <button class="btn-quick-join" style="width:100%; height:40px;" onclick="document.getElementById('modal-role').style.display='none'">Tushundim</button>
             </div>
         </div>
     </div>

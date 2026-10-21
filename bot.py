@@ -18,7 +18,6 @@ async def root():
         return FileResponse("static/index.html")
     return {"message": "index.html topilmadi."}
 
-# Profil statistikasi (o'yinlar, g'alabalar va mafia bo'lib o'ynagan o'yinlar)
 stats_db: Dict[str, dict] = {}
 
 @app.get("/api/profile/{user_id}")
@@ -142,7 +141,6 @@ async def trigger_last_word(room: GameRoom, victim: Player):
     await broadcast(room, {"type": "players_update", "players": get_public_players(room)})
 
 async def game_loop(room: GameRoom):
-    # Statistika yangilash (umumiy o'yinlar va kim mafia bo'lgani)
     for pid, p in room.players.items():
         if pid not in stats_db:
             stats_db[pid] = {"games": 0, "wins": 0, "mafia_games": 0}
@@ -254,7 +252,6 @@ def evaluate_game_status(room: GameRoom) -> bool:
 async def ws_handler(websocket: WebSocket, room_id: str, user_id: str, name: str = Query("O'yinchi"), avatar: str = Query("")):
     await websocket.accept()
 
-    # Ism ko'pi bilan 6 ta belgi bo'lishi shart
     clean_name = name[:6] if name else "Player"
 
     if room_id not in rooms:
@@ -307,7 +304,6 @@ async def ws_handler(websocket: WebSocket, room_id: str, user_id: str, name: str
                 random.shuffle(p_ids)
 
                 total_count = len(p_ids)
-                # O'yinchilar soniga qarab tasodifiy rollar
                 if total_count >= 12:
                     roles = ["mafia", "mafia", "mafia", "commissar", "doctor"]
                 elif total_count >= 8:
@@ -318,7 +314,6 @@ async def ws_handler(websocket: WebSocket, room_id: str, user_id: str, name: str
                 while len(roles) < total_count:
                     roles.append("citizen")
 
-                # To'liq tasodifiy aralashtirish
                 random.shuffle(roles)
 
                 for idx, pid in enumerate(p_ids):

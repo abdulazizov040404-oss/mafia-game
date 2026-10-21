@@ -5,14 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Mafia Online</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/style.css?v=3.0">
 </head>
 <body>
     <div class="app-wrapper">
         <!-- 1. BOSH MENYU -->
         <div id="screen-home">
             <header class="main-header">
-                <button class="gold-icon-btn" onclick="toggleTheme()" id="theme-toggle-btn" title="Rejim">🌓</button>
+                <button class="gold-icon-btn" onclick="toggleTheme()" id="theme-toggle-btn">🌓</button>
                 <div class="pro-banner-title">MAFIA CLUB</div>
                 <button class="gold-icon-btn" onclick="openProfile(false)">👤</button>
             </header>
@@ -33,7 +33,7 @@
 
             <div class="streak-card">
                 <span>🔥 7 kunlik seriya</span>
-                <strong style="color:var(--accent-gold);">Bugun: Faol</strong>
+                <strong style="color:var(--gold);">Bugun: Faol</strong>
             </div>
 
             <div class="rooms-section-header">
@@ -41,57 +41,49 @@
                 <span id="active-rooms-count">0 ta xona</span>
             </div>
 
-            <div id="rooms-list" class="rooms-list-container">
-                <!-- Xonalar -->
-            </div>
+            <div id="rooms-list" class="rooms-list-container"></div>
         </div>
 
         <!-- 2. O'YIN VA CHAT ZALI -->
         <div id="screen-game" class="game-screen" style="display: none;">
             <div class="game-top-nav">
-                <button class="gold-icon-btn" style="width:36px; height:36px; font-size:1rem;" onclick="leaveRoom()">←</button>
+                <button class="gold-icon-btn" style="width:34px; height:34px; font-size:0.9rem;" onclick="leaveRoom()">←</button>
                 <div class="game-top-center">
-                    <div id="in-game-room-name" class="game-room-name">Xona nomi</div>
+                    <div id="in-game-room-name" class="game-room-name">Xona</div>
                     <div id="in-game-room-stats" class="game-players-count-sub">0/16 o'yinchi</div>
                 </div>
-                <!-- Kamida 4 kishi bo'lgandagina chiqadigan boshlash tugmasi -->
-                <button id="host-start-btn" style="display:none; background:var(--accent-green); border:none; color:#fff; border-radius:12px; padding:6px 12px; font-size:0.75rem; font-weight:700;" onclick="startGame()">Boshlash</button>
-                <span id="players-wait-hint" style="display:none; font-size:0.68rem; color:var(--text-sub);">Kutilmoqda...</span>
+                <button id="host-start-btn" style="display:none; background:var(--green); border:none; color:#fff; border-radius:10px; padding:6px 12px; font-size:0.75rem; font-weight:700;" onclick="startGame()">Boshlash</button>
+                <span id="players-wait-hint" style="display:none; font-size:0.65rem; color:var(--text-muted);">Kutilmoqda...</span>
             </div>
 
-            <!-- O'YINCHILARNING DUMALOQ AVATARLARI QATORI -->
             <div id="players-horizontal" class="players-horizontal-panel"></div>
 
-            <!-- BOSQICH VA TAYMER -->
-            <div style="background:var(--card-bg); padding:6px 14px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-color); font-size:0.8rem;">
-                <span id="phase-badge" style="font-weight:700; color:var(--accent-gold);">Kutish zali</span>
-                <span id="game-timer" style="font-weight:900; color:var(--accent-blue);">01:00</span>
+            <div style="background:var(--card); padding:6px 12px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); font-size:0.78rem;">
+                <span id="phase-badge" style="font-weight:700; color:var(--gold);">Kutish zali</span>
+                <span id="game-timer" style="font-weight:900; color:var(--blue);">01:00</span>
             </div>
 
-            <!-- AMALLAR PANELI -->
-            <div id="action-panel" style="display:none; background:var(--panel-bg); padding:10px; border-bottom:1px solid var(--border-color);">
-                <div id="action-title" style="font-size:0.78rem; color:var(--text-sub); margin-bottom:6px;">Tanlang:</div>
+            <div id="action-panel" style="display:none; background:var(--panel); padding:8px 12px; border-bottom:1px solid var(--border);">
+                <div id="action-title" style="font-size:0.75rem; color:var(--text-muted); margin-bottom:4px;">Tanlang:</div>
                 <div id="action-buttons-box" style="display:flex; flex-wrap:wrap; gap:6px;"></div>
             </div>
 
-            <!-- TELEGRAM CHAT -->
             <div id="chat-messages" class="telegram-chat-area"></div>
 
-            <!-- CHAT INPUT -->
             <div class="chat-bottom-input-bar">
                 <input type="text" id="chat-input" class="chat-input-modern" placeholder="Xabaringizni yozing..." maxlength="200" onkeydown="if(event.key==='Enter') sendChat()">
                 <button class="chat-send-round-btn" onclick="sendChat()">➤</button>
             </div>
         </div>
 
-        <!-- 3. PROFIL / BIRINCHI KIRGANDAGI MODAL -->
+        <!-- 3. PROFIL MODALI -->
         <div id="modal-profile" class="modal-overlay" style="display: none;">
             <div class="modal-content-panel">
-                <h3 id="prof-modal-title" style="margin-bottom: 10px; font-size:1.1rem; text-align:center;">👤 Profilingizni sozlang</h3>
+                <h3 id="prof-modal-title" style="margin-bottom: 10px; font-size:1rem; text-align:center;">👤 Profilingizni sozlang</h3>
                 
                 <div style="display:flex; flex-direction:column; align-items:center; margin-bottom:10px;">
-                    <img id="prof-preview-avatar" src="" style="width:68px; height:68px; border-radius:50%; object-fit:cover; border:2px solid var(--accent-gold); margin-bottom:6px;">
-                    <label for="avatar-file-input" style="font-size:0.75rem; color:var(--accent-blue); cursor:pointer; font-weight:700; background:var(--card-bg); padding:4px 10px; border-radius:12px; border:1px solid var(--border-color);">
+                    <img id="prof-preview-avatar" src="" style="width:64px; height:64px; border-radius:50%; object-fit:cover; border:2px solid var(--gold); margin-bottom:6px;">
+                    <label for="avatar-file-input" style="font-size:0.75rem; color:var(--blue); cursor:pointer; font-weight:700; background:var(--card); padding:4px 10px; border-radius:10px; border:1px solid var(--border);">
                         📁 Fayldan yuklash
                     </label>
                     <input type="file" id="avatar-file-input" accept="image/*" style="display:none;" onchange="handleFileUpload(event)">
@@ -104,37 +96,36 @@
 
                 <div class="input-field-block">
                     <label>Yoki tayyor avatardan tanlang:</label>
-                    <div id="avatar-presets-box" style="display:flex; gap:8px; justify-content:center; overflow-x:auto; padding:4px 0;"></div>
+                    <div id="avatar-presets-box" style="display:flex; gap:8px; justify-content:center; padding:4px 0;"></div>
                 </div>
 
-                <!-- STATISTIKA (MAFIA FOIZI BILAN) -->
                 <div id="prof-stats-container" style="display:grid; grid-template-columns: repeat(4, 1fr); gap:6px; margin:10px 0; text-align:center;">
-                    <div style="background:var(--card-bg); padding:8px 4px; border-radius:10px;">
-                        <div id="prof-games" style="font-weight:800; color:var(--accent-blue);">0</div>
-                        <div style="font-size:0.65rem; color:var(--text-sub);">O'yinlar</div>
+                    <div style="background:var(--card); padding:6px 2px; border-radius:8px;">
+                        <div id="prof-games" style="font-weight:800; color:var(--blue); font-size:0.9rem;">0</div>
+                        <div style="font-size:0.6rem; color:var(--text-muted);">O'yinlar</div>
                     </div>
-                    <div style="background:var(--card-bg); padding:8px 4px; border-radius:10px;">
-                        <div id="prof-wins" style="font-weight:800; color:var(--accent-green);">0</div>
-                        <div style="font-size:0.65rem; color:var(--text-sub);">G'alaba</div>
+                    <div style="background:var(--card); padding:6px 2px; border-radius:8px;">
+                        <div id="prof-wins" style="font-weight:800; color:var(--green); font-size:0.9rem;">0</div>
+                        <div style="font-size:0.6rem; color:var(--text-muted);">G'alaba</div>
                     </div>
-                    <div style="background:var(--card-bg); padding:8px 4px; border-radius:10px;">
-                        <div id="prof-rate" style="font-weight:800; color:var(--accent-gold);">0%</div>
-                        <div style="font-size:0.65rem; color:var(--text-sub);">Yutuq %</div>
+                    <div style="background:var(--card); padding:6px 2px; border-radius:8px;">
+                        <div id="prof-rate" style="font-weight:800; color:var(--gold); font-size:0.9rem;">0%</div>
+                        <div style="font-size:0.6rem; color:var(--text-muted);">Yutuq %</div>
                     </div>
-                    <div style="background:var(--card-bg); padding:8px 4px; border-radius:10px;">
-                        <div id="prof-mafia-rate" style="font-weight:800; color:var(--accent-red);">0%</div>
-                        <div style="font-size:0.65rem; color:var(--text-sub);">Mafia %</div>
+                    <div style="background:var(--card); padding:6px 2px; border-radius:8px;">
+                        <div id="prof-mafia-rate" style="font-weight:800; color:var(--red); font-size:0.9rem;">0%</div>
+                        <div style="font-size:0.6rem; color:var(--text-muted);">Mafia %</div>
                     </div>
                 </div>
 
-                <button class="btn-quick-join" style="width:100%; height:42px; margin-top:8px;" onclick="saveProfile()">Saqlash va davom etish</button>
+                <button class="btn-quick-join" style="width:100%; height:40px; margin-top:6px;" onclick="saveProfile()">Saqlash</button>
             </div>
         </div>
 
         <!-- 4. XONA YARATISH MODALI -->
         <div id="modal-create-room" class="modal-overlay" style="display: none;">
             <div class="modal-content-panel">
-                <h3 style="margin-bottom: 12px; font-size:1.1rem;">Yangi xona yaratish</h3>
+                <h3 style="margin-bottom: 10px; font-size:1rem;">Yangi xona yaratish</h3>
                 <div class="input-field-block">
                     <label>Xona nomi:</label>
                     <input type="text" id="cr-room-name" class="input-modern" placeholder="Masalan: Bordo xona" maxlength="25">
@@ -147,9 +138,9 @@
                         <button class="time-tab-btn" id="tab-180" onclick="selectTime(180)">3 daq</button>
                     </div>
                 </div>
-                <div style="display:flex; gap:8px; margin-top:16px;">
+                <div style="display:flex; gap:8px; margin-top:14px;">
                     <button class="time-tab-btn" onclick="closeCreateRoomModal()">Bekor qilish</button>
-                    <button class="btn-quick-join" style="flex:1; height:40px;" onclick="confirmCreateRoom()">Yaratish</button>
+                    <button class="btn-quick-join" style="flex:1; height:38px;" onclick="confirmCreateRoom()">Yaratish</button>
                 </div>
             </div>
         </div>
@@ -157,13 +148,13 @@
         <!-- 5. ROL MODALI -->
         <div id="modal-role" class="modal-overlay" style="display: none;">
             <div class="modal-content-panel" style="text-align:center;">
-                <img id="role-img-card" src="" style="width:100%; height:180px; object-fit:cover; border-radius:14px; margin-bottom:8px;" alt="Rol">
-                <h3 id="role-title-card" style="font-size:1.1rem; color:var(--accent-gold);">ROL</h3>
-                <p id="role-desc-card" style="font-size:0.8rem; color:var(--text-sub); margin:8px 0 14px; text-align:left; line-height:1.4;"></p>
-                <button class="btn-quick-join" style="width:100%; height:40px;" onclick="document.getElementById('modal-role').style.display='none'">Tushundim</button>
+                <img id="role-img-card" src="" style="width:100%; height:160px; object-fit:cover; border-radius:12px; margin-bottom:8px;">
+                <h3 id="role-title-card" style="font-size:1rem; color:var(--gold);">ROL</h3>
+                <p id="role-desc-card" style="font-size:0.75rem; color:var(--text-muted); margin:6px 0 12px; text-align:left; line-height:1.4;"></p>
+                <button class="btn-quick-join" style="width:100%; height:38px;" onclick="document.getElementById('modal-role').style.display='none'">Tushundim</button>
             </div>
         </div>
     </div>
-    <script src="/static/bot.js"></script>
+    <script src="/static/bot.js?v=3.0"></script>
 </body>
 </html>

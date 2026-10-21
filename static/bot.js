@@ -8,12 +8,11 @@ const userId = tg?.initDataUnsafe?.user?.id
     ? String(tg.initDataUnsafe.user.id) 
     : "id_" + Math.floor(Math.random() * 89999 + 10000);
 
-// Yuqori sifatli tayyor avatarlar
 const presetAvatars = [
-    "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80",
-    "https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=150&auto=format&fit=crop&q=80",
-    "https://images.unsplash.com/photo-1580489944761-15a19d654956?w=150&auto=format&fit=crop&q=80",
-    "https://images.unsplash.com/photo-1628157582853-a796fa650a6a?w=150&auto=format&fit=crop&q=80"
+    "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&auto=format&fit=crop&q=80",
+    "https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=120&auto=format&fit=crop&q=80",
+    "https://images.unsplash.com/photo-1580489944761-15a19d654956?w=120&auto=format&fit=crop&q=80",
+    "https://images.unsplash.com/photo-1628157582853-a796fa650a6a?w=120&auto=format&fit=crop&q=80"
 ];
 
 let userName = localStorage.getItem("mafia_username") || "";
@@ -31,12 +30,11 @@ let selectedTimerMinutes = 60;
 let currentVotesData = {};
 let currentPlayersData = [];
 
-// Rollar rasmlari
 const roleAssets = {
     mafia: {
         title: "🔫 MAFIA",
         img: "https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=600&auto=format&fit=crop&q=80",
-        desc: "Siz shafqatsiz mafiasiz! Har kecha sheriklaringiz bilan birgalikda begunohlarni yo'q qiling. Kunduzi o'zingizni oddiy fuqarodek tuting."
+        desc: "Siz shafqatsiz mafiasiz! Tunda sheriklaringiz bilan birgalikda begunohlarni yo'q qiling. Kunduzi o'zingizni oddiy fuqarodek tuting."
     },
     doctor: {
         title: "💉 SHIFOKOR",
@@ -61,7 +59,6 @@ function toggleTheme() {
     document.getElementById("theme-toggle-btn").innerText = isLight ? "☀️" : "🌓";
 }
 
-// Fayldan avatar yuklash
 function handleFileUpload(event) {
     const file = event.target.files[0];
     if (file) {
@@ -84,7 +81,7 @@ function renderPresetAvatars() {
     presetAvatars.forEach(url => {
         const img = document.createElement("img");
         img.src = url;
-        img.style = "width:36px; height:36px; border-radius:50%; object-fit:cover; cursor:pointer; border:2px solid transparent;";
+        img.style = "width:34px; height:34px; border-radius:50%; object-fit:cover; cursor:pointer;";
         img.onclick = () => {
             userAvatar = url;
             document.getElementById("prof-preview-avatar").src = url;
@@ -93,13 +90,13 @@ function renderPresetAvatars() {
     });
 }
 
-function openProfile(isMandatoryFirstTime = false) {
+function openProfile(isMandatory = false) {
     renderPresetAvatars();
     document.getElementById("prof-preview-avatar").src = userAvatar;
     document.getElementById("prof-input-name").value = userName;
     
-    const title = document.getElementById("prof-modal-title");
-    title.innerText = isMandatoryFirstTime ? "👋 Xush kelibsiz! Ismingizni kiriting" : "👤 Profil ma'lumotlari";
+    document.getElementById("prof-modal-title").innerText = 
+        isMandatory ? "👋 Xush kelibsiz! Ismingizni kiriting" : "👤 Profil ma'lumotlari";
 
     fetch(`/api/profile/${userId}`)
         .then(r => r.json())
@@ -125,12 +122,12 @@ function closeProfile() {
 
 function saveProfile() {
     const val = document.getElementById("prof-input-name").value.trim();
-    if (!val || val.length === 0) {
+    if (!val) {
         alert("Iltimos, ismingizni kiriting!");
         return;
     }
     if (val.length > 6) {
-        alert("Ism ko'pi bilan 6 ta harfdan iborat bo'lishi kerak!");
+        alert("Ism ko'pi bilan 6 ta harf bo'lishi kerak!");
         return;
     }
     userName = val;
@@ -139,7 +136,6 @@ function saveProfile() {
     document.getElementById("modal-profile").style.display = "none";
 }
 
-// Birinchi marta kirganda ism tekshiruvi
 if (!userName || userName.length > 6) {
     openProfile(true);
 }
@@ -169,7 +165,7 @@ function refreshRooms() {
             const list = document.getElementById("rooms-list");
             document.getElementById("active-rooms-count").innerText = `${data.rooms.length} ta xona`;
             if (data.rooms.length === 0) {
-                list.innerHTML = `<p style="text-align:center; color:var(--text-sub); padding:30px 0;">Ochiq xonalar mavjud emas.</p>`;
+                list.innerHTML = `<p style="text-align:center; color:var(--text-muted); padding:30px 0; font-size:0.85rem;">Ochiq xonalar mavjud emas.</p>`;
                 return;
             }
             list.innerHTML = "";
@@ -282,7 +278,6 @@ function joinRoom(roomId) {
     };
 }
 
-// 4 kishi bo'lmaguncha boshlash tugmasi chiqmasligi
 function updateHostStartButtonVisibility() {
     const startBtn = document.getElementById("host-start-btn");
     const waitHint = document.getElementById("players-wait-hint");
@@ -419,7 +414,7 @@ function appendChatBubble(sender, avatar, text, isSelf, isSystem, isLastWord) {
 
 function startGame() {
     if (userName.length > 6) {
-        alert("Ismingiz 6 ta harfdan ko'p bo'lsa o'yinni boshlay olmaysiz! Profilingizdan ismingizni qisqartiring.");
+        alert("Ismingiz 6 ta harfdan ko'p bo'lsa o'yinni boshlay olmaysiz!");
         return;
     }
     if (currentPlayersData.length < 4) {

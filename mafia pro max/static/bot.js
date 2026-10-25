@@ -18,6 +18,19 @@ const presetAvatars = [
 let userName = localStorage.getItem("mafia_username") || "";
 let userAvatar = localStorage.getItem("mafia_avatar") || presetAvatars[0];
 
+// Telegram foydalanuvchi ma'lumotlarini avtomatik to'ldirish
+if (tg?.initDataUnsafe?.user) {
+    const u = tg.initDataUnsafe.user;
+    if (!userName && u.first_name) {
+        userName = u.first_name.slice(0, 6);
+        localStorage.setItem("mafia_username", userName);
+    }
+    if (!localStorage.getItem("mafia_avatar") && u.photo_url) {
+        userAvatar = u.photo_url;
+        localStorage.setItem("mafia_avatar", userAvatar);
+    }
+}
+
 const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
 let ws = null;
 let currentRoomId = null;
@@ -39,12 +52,12 @@ const roleAssets = {
     doctor: {
         title: "💉 SHIFOKOR",
         img: "https://images.unsplash.com/photo-1579684385127-1ef15d508118?w=600&auto=format&fit=crop&q=80",
-        desc: "Siz shahar shifokorisisiz! Tunda kimnidir davolang va uni mafianing o'qidan asrab qoling."
+        desc: "Siz shahar shifokorisisiz! Tunda kimnidir davolang va uni mafianing o'qidan asrab qoling. Bir odamni ketma-ket ikki kecha davolay olmaysiz."
     },
     commissar: {
         title: "🔍 KOMISSAR",
         img: "https://images.unsplash.com/photo-1541872703-74c5e44368f9?w=600&auto=format&fit=crop&q=80",
-        desc: "Siz tergovchisiz! Har kecha bitta odamni tekshirib, uning mafia ekanini aniqlang."
+        desc: "Siz tergovchisiz! Har kecha bitta odamni tekshirib, uning mafia yoki tinch fuqaro ekanini aniqlaysiz."
     },
     citizen: {
         title: "👤 TINCH FUQARO",
@@ -59,20 +72,40 @@ function toggleTheme() {
     document.getElementById("theme-toggle-btn").innerText = isLight ? "☀️" : "🌓";
 }
 
+// Rasmni avtomatik siqish (Canvas orqali 120x120 JPEG ga aylantirish)
 function handleFileUpload(event) {
     const file = event.target.files[0];
-    if (file) {
-        if (file.size > 2 * 1024 * 1024) {
-            alert("Rasm hajmi 2MB dan kichik bo'lishi kerak!");
-            return;
-        }
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            userAvatar = e.target.result;
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+        alert("Rasm hajmi juda katta! Iltimos, 5MB dan kichik rasm tanlang.");
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const img = new Image();
+        img.onload = function() {
+            const canvas = document.createElement("canvas");
+            const maxDim = 120;
+            let w = img.width, h = img.height;
+            if (w > h) {
+                h = (h / w) * maxDim;
+                w = maxDim;
+            } else {
+                w = (w / h) * maxDim;
+                h = maxDim;
+            }
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext("2d");
+            ctx.drawImage(img, 0, 0, w, h);
+            userAvatar = canvas.toDataURL("image/jpeg", 0.75);
             document.getElementById("prof-preview-avatar").src = userAvatar;
         };
-        reader.readAsDataURL(file);
-    }
+        img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
 }
 
 function renderPresetAvatars() {
@@ -107,7 +140,8 @@ function openProfile(isMandatory = false) {
             const mafiaRate = d.games ? Math.round(((d.mafia_games || 0) / d.games) * 100) : 0;
             document.getElementById("prof-rate").innerText = rate + "%";
             document.getElementById("prof-mafia-rate").innerText = mafiaRate + "%";
-        });
+        })
+        .catch(() => {});
 
     document.getElementById("modal-profile").style.display = "flex";
 }
@@ -134,6 +168,14 @@ function saveProfile() {
     localStorage.setItem("mafia_username", userName);
     localStorage.setItem("mafia_avatar", userAvatar);
     document.getElementById("modal-profile").style.display = "none";
+
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({
+            action: "update_profile",
+            name: userName,
+            avatar: userAvatar
+        }));
+    }
 }
 
 if (!userName || userName.length > 6) {
@@ -189,7 +231,8 @@ function refreshRooms() {
                 `;
                 list.appendChild(el);
             });
-        });
+        })
+        .catch(() => {});
 }
 
 function quickJoin() {
@@ -207,6 +250,7 @@ function quickJoin() {
 
 function confirmCreateRoom() {
     const rName = document.getElementById("cr-room-name").value.trim() || "Bordo xona";
+    const hostAva = userAvatar.startsWith("data:") ? presetAvatars[0] : userAvatar;
     fetch("/api/create_room", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -214,7 +258,7 @@ function confirmCreateRoom() {
             name: rName,
             time_sec: selectedTimerMinutes,
             host_name: userName,
-            host_avatar: userAvatar
+            host_avatar: hostAva
         })
     })
     .then(r => r.json())
@@ -226,11 +270,25 @@ function confirmCreateRoom() {
 
 function joinRoom(roomId) {
     currentRoomId = roomId;
+    isAlive = true;
     document.getElementById("screen-home").style.display = "none";
     document.getElementById("screen-game").style.display = "flex";
 
-    const q = `name=${encodeURIComponent(userName)}&avatar=${encodeURIComponent(userAvatar)}`;
+    // URL parametriga faqat qisqa avatar qo'yish (414 xatoligini oldini olish)
+    const initialAvatar = userAvatar.startsWith("data:") ? "" : userAvatar;
+    const q = `name=${encodeURIComponent(userName)}&avatar=${encodeURIComponent(initialAvatar)}`;
     ws = new WebSocket(`${protocol}//${window.location.host}/ws/${roomId}/${userId}?${q}`);
+
+    ws.onopen = () => {
+        // Agar o'ziga xos rasm yuklangan bo'lsa, uni websocket orqali yangilaymiz
+        if (userAvatar) {
+            ws.send(JSON.stringify({
+                action: "update_profile",
+                name: userName,
+                avatar: userAvatar
+            }));
+        }
+    };
 
     ws.onmessage = (event) => {
         const d = JSON.parse(event.data);
@@ -251,8 +309,16 @@ function joinRoom(roomId) {
             const r = roleAssets[myRole] || roleAssets.citizen;
             document.getElementById("role-img-card").src = r.img;
             document.getElementById("role-title-card").innerText = r.title;
-            document.getElementById("role-desc-card").innerText = r.desc;
+            let desc = r.desc;
+            if (myRole === "mafia" && d.partners && d.partners.length > 0) {
+                desc += "\n\n👥 Sizning mafia sheriklaringiz: " + d.partners.join(", ");
+            }
+            document.getElementById("role-desc-card").innerText = desc;
             document.getElementById("modal-role").style.display = "flex";
+        }
+        else if (d.type === "commissar_result") {
+            appendChatBubble("Tergovchi", presetAvatars[0], "🔍 TERGOV NATIJASI: " + d.text, false, true, false);
+            alert("🔍 TERGOV NATIJASI:\n" + d.text);
         }
         else if (d.type === "phase_change") {
             handlePhaseChange(d);
@@ -265,6 +331,19 @@ function joinRoom(roomId) {
         else if (d.type === "players_update") {
             currentPlayersData = d.players;
             document.getElementById("in-game-room-stats").innerText = `${d.players.length}/16 o'yinchi`;
+            
+            // O'yinchi holatini (tirik/o'lik) aniqlash
+            const me = d.players.find(p => p.id === userId);
+            if (me) {
+                isAlive = me.is_alive;
+                if (!isAlive) {
+                    document.getElementById("action-panel").style.display = "none";
+                    const badge = document.getElementById("phase-badge");
+                    if (badge && !badge.innerText.includes("KUZATUVCHI")) {
+                        badge.innerText += " (Kuzatuvchi)";
+                    }
+                }
+            }
             renderHorizontalPlayers();
             updateHostStartButtonVisibility();
         }
@@ -276,10 +355,15 @@ function joinRoom(roomId) {
             appendChatBubble(d.sender, d.avatar, d.text, d.is_self, d.is_system, d.is_last_word);
         }
     };
+
+    ws.onclose = () => {
+        // Aloqa uzilsa
+    };
 }
 
 function updateHostStartButtonVisibility() {
     const startBtn = document.getElementById("host-start-btn");
+    const restartBtn = document.getElementById("host-restart-btn");
     const waitHint = document.getElementById("players-wait-hint");
 
     if (isHost) {
@@ -293,6 +377,7 @@ function updateHostStartButtonVisibility() {
         }
     } else {
         startBtn.style.display = "none";
+        restartBtn.style.display = "none";
         waitHint.style.display = "none";
     }
 }
@@ -301,6 +386,9 @@ function handlePhaseChange(d) {
     const badge = document.getElementById("phase-badge");
     const actPanel = document.getElementById("action-panel");
     const actBox = document.getElementById("action-buttons-box");
+    const restartBtn = document.getElementById("host-restart-btn");
+    const startBtn = document.getElementById("host-start-btn");
+    
     actBox.innerHTML = "";
     currentVotesData = {};
     renderHorizontalPlayers();
@@ -308,34 +396,48 @@ function handlePhaseChange(d) {
     isLastWordPhase = (d.phase === "last_word");
     lastWordSpeakerId = d.speaker_id || null;
 
-    if (d.phase === "discussion") {
-        badge.innerText = "☀️ Kunduzgi Muhokama";
+    if (d.phase === "lobby") {
+        badge.innerText = "Kutish zali";
+        badge.style.color = "var(--gold)";
         actPanel.style.display = "none";
+        if (restartBtn) restartBtn.style.display = "none";
+        updateHostStartButtonVisibility();
+    }
+    else if (d.phase === "discussion") {
+        badge.innerText = isAlive ? "☀️ Kunduzgi Muhokama" : "☀️ Kunduzgi Muhokama (Kuzatuvchi)";
+        badge.style.color = "var(--gold)";
+        actPanel.style.display = "none";
+        if (startBtn) startBtn.style.display = "none";
+        if (restartBtn) restartBtn.style.display = "none";
     }
     else if (d.phase === "voting" || d.phase === "revoting") {
         badge.innerText = "🗳 Ovoz berish (30s)";
+        badge.style.color = "var(--blue)";
         if (isAlive) {
             actPanel.style.display = "block";
             document.getElementById("action-title").innerText = "Gumonlanuvchini tanlang:";
-            d.candidates.forEach(c => {
-                const b = document.createElement("button");
-                b.className = "time-tab-btn";
-                b.innerText = c.name;
-                b.onclick = () => {
-                    ws.send(JSON.stringify({ action: "vote", target_id: c.id }));
-                    actPanel.style.display = "none";
-                };
-                actBox.appendChild(b);
+            (d.candidates || []).forEach(c => {
+                if (c.id !== userId) {
+                    const b = document.createElement("button");
+                    b.className = "time-tab-btn";
+                    b.innerText = c.name;
+                    b.onclick = () => {
+                        ws.send(JSON.stringify({ action: "vote", target_id: c.id }));
+                        actPanel.style.display = "none";
+                    };
+                    actBox.appendChild(b);
+                }
             });
         }
     }
     else if (d.phase === "night") {
         badge.innerText = "🌙 Tun bosqichi";
+        badge.style.color = "#a55eea";
         if (isAlive && ["mafia", "doctor", "commissar"].includes(myRole)) {
             actPanel.style.display = "block";
             document.getElementById("action-title").innerText = 
                 myRole === "mafia" ? "Mafia nishoni:" : (myRole === "doctor" ? "Davolash:" : "Tekshirish:");
-            d.targets.forEach(t => {
+            (d.targets || []).forEach(t => {
                 const b = document.createElement("button");
                 b.className = "time-tab-btn";
                 b.innerText = t.name;
@@ -349,7 +451,23 @@ function handlePhaseChange(d) {
     }
     else if (d.phase === "last_word") {
         badge.innerText = "🎤 OXIRGI SO'Z BOSQICHI";
+        badge.style.color = "var(--red)";
         actPanel.style.display = "none";
+    }
+    else if (d.phase === "game_over") {
+        const isWin = (d.winner === "mafia" && myRole === "mafia") || (d.winner === "citizens" && myRole !== "mafia");
+        badge.innerText = isWin ? "🏆 SIZ G'ALABA QOZONDINGIZ!" : "💀 O'YIN TUGADI";
+        badge.style.color = isWin ? "var(--green)" : "var(--red)";
+        actPanel.style.display = "none";
+        if (isHost && restartBtn) {
+            restartBtn.style.display = "block";
+        }
+    }
+}
+
+function restartGame() {
+    if (ws && isHost) {
+        ws.send(JSON.stringify({ action: "restart_game" }));
     }
 }
 
@@ -384,7 +502,10 @@ function sendChat() {
         return;
     }
 
-    if (!isAlive && !isLastWordPhase) return;
+    if (!isAlive && !isLastWordPhase) {
+        alert("Siz o'yindan chiqqansiz, faqat kuzatuvchi sifatida qatnasha olasiz.");
+        return;
+    }
 
     ws.send(JSON.stringify({ action: "chat", text: val }));
     inp.value = "";
@@ -445,4 +566,3 @@ function leaveRoomLocally() {
 
 refreshRooms();
 setInterval(refreshRooms, 4000);
-

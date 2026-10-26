@@ -38,11 +38,26 @@ body.light-theme {
 }
 
 body {
-  background: var(--bg);
+  background-color: #0c0f17;
+  background-image: 
+    linear-gradient(rgba(10, 13, 20, 0.72), rgba(10, 13, 20, 0.88)),
+    url('/bg.jpg');
+  background-repeat: no-repeat;
+  background-position: center center;
+  background-size: cover;
+  background-attachment: fixed;
   color: var(--text);
   min-height: 100vh;
   display: flex;
   justify-content: center;
+}
+
+body.light-theme {
+  background-color: #f4f6f9;
+  background-image: 
+    linear-gradient(rgba(244, 246, 249, 0.75), rgba(244, 246, 249, 0.90)),
+    url('/bg.jpg');
+  background-position: left center;
 }
 
 .app-wrapper {
@@ -52,7 +67,36 @@ body {
   display: flex;
   flex-direction: column;
   position: relative;
-  background: var(--bg);
+  background-color: rgba(14, 18, 27, 0.85);
+  background-image: 
+    linear-gradient(180deg, rgba(12, 15, 23, 0.65) 0%, rgba(12, 15, 23, 0.85) 45%, rgba(12, 15, 23, 0.95) 100%),
+    url('/bg.jpg');
+  background-repeat: no-repeat;
+  background-position: 0% top;
+  background-size: 200% 100%;
+  box-shadow: 0 0 50px rgba(0, 0, 0, 0.9);
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  transition: background-position 1s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.5s ease;
+}
+
+body.light-theme .app-wrapper {
+  background-color: rgba(255, 255, 255, 0.88);
+  background-image: 
+    linear-gradient(180deg, rgba(244, 246, 249, 0.70) 0%, rgba(244, 246, 249, 0.92) 100%),
+    url('/bg.jpg');
+  background-position: 0% top;
+}
+
+/* O'yin fazasi bo'yicha fon animatsiyasi */
+.app-wrapper.phase-day, body.phase-day .app-wrapper {
+  background-position: 0% top !important;
+}
+
+.app-wrapper.phase-night, body.phase-night .app-wrapper {
+  background-position: 100% top !important;
 }
 
 /* 1-EKRAN: BOSH MENYU */
@@ -697,12 +741,13 @@ body {
 }
 
 .guide-role-img {
-  width: 52px;
-  height: 52px;
-  border-radius: 10px;
+  width: 64px;
+  height: 64px;
+  border-radius: 14px;
   object-fit: cover;
   flex-shrink: 0;
-  border: 1px solid var(--border);
+  border: 1px solid rgba(245, 176, 65, 0.3);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
 }
 
 .guide-role-info {
@@ -710,7 +755,7 @@ body {
 }
 
 .guide-role-name {
-  font-size: 0.85rem;
+  font-size: 0.95rem;
   font-weight: 800;
   margin-bottom: 3px;
 }
@@ -750,8 +795,37 @@ body {
 .guide-role-desc {
   font-size: 0.74rem;
   color: var(--text-muted);
-  line-height: 1.4;
+  line-height: 1.45;
   margin-bottom: 6px;
+}
+
+.guide-role-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin: 6px 0;
+}
+
+.role-pill {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 20px;
+  padding: 3px 9px;
+  font-size: 0.65rem;
+  color: #cbd5e1;
+  font-weight: 500;
+  display: inline-block;
+}
+
+.guide-role-maslahat {
+  background: rgba(245, 176, 65, 0.08);
+  border: 1px solid rgba(245, 176, 65, 0.22);
+  border-radius: 10px;
+  padding: 6px 10px;
+  font-size: 0.68rem;
+  color: #cbd5e1;
+  line-height: 1.4;
+  margin-top: 6px;
 }
 
 .guide-role-details {
@@ -918,7 +992,24 @@ body {
 
 .leaderboard-item.top-1 {
   border-color: rgba(245, 176, 65, 0.5);
-  background: linear-gradient(90deg, rgba(245, 176, 65, 0.12), transparent);
+  background: linear-gradient(90deg, rgba(245, 176, 65, 0.15), rgba(28, 34, 51, 0.85));
+}
+
+.leaderboard-item.is-me {
+  border-color: rgba(91, 127, 255, 0.7) !important;
+  background: linear-gradient(90deg, rgba(91, 127, 255, 0.20), rgba(28, 34, 51, 0.90)) !important;
+  box-shadow: 0 0 14px rgba(91, 127, 255, 0.25);
+}
+
+.lb-me-tag {
+  background: var(--blue);
+  color: #fff;
+  font-size: 0.62rem;
+  padding: 1px 6px;
+  border-radius: 6px;
+  font-weight: 700;
+  margin-left: 5px;
+  vertical-align: middle;
 }
 
 .lb-rank-badge {

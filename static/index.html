@@ -21,7 +21,6 @@
             <div class="gold-icons-bar">
                 <button class="gold-icon-btn" onclick="openGuideModal('rules')" title="Qo'llanma va Qoidalar">📖</button>
                 <button class="gold-icon-btn" onclick="openLeaderboardModal()" title="Top Reyting">🏆</button>
-                <button class="gold-icon-btn" onclick="openDailyBonusModal()" title="Kunlik Sovg'a">🎁</button>
                 <button class="gold-icon-btn" onclick="openChannelLink()" title="Rasmiy Kanal">📢</button>
                 <button class="gold-icon-btn" onclick="openProfile(false)" title="Mening Profilim">👤</button>
             </div>
@@ -30,11 +29,6 @@
                 <button class="btn-square-gold" onclick="openCreateRoomModal()">+</button>
                 <button class="btn-quick-join" onclick="quickJoin()">⚡ Tezkor qo'shilish</button>
                 <button class="btn-square-gold" onclick="refreshRooms()">⟳</button>
-            </div>
-
-            <div class="streak-card" onclick="openDailyBonusModal()" style="cursor: pointer;" title="Kunlik bonusni olish">
-                <span id="streak-banner-title">🔥 7 kunlik seriya</span>
-                <strong id="streak-banner-btn" style="color:var(--gold); display:flex; align-items:center; gap:4px;">🎁 Sovg'ani olish ›</strong>
             </div>
 
             <div class="rooms-section-header">
@@ -66,6 +60,12 @@
             <div style="background:var(--card); padding:6px 12px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); font-size:0.78rem;">
                 <span id="phase-badge" style="font-weight:700; color:var(--gold);">Kutish zali</span>
                 <span id="game-timer" style="font-weight:900; color:var(--blue);">01:00</span>
+            </div>
+
+            <div id="rais-action-bar" style="display:none; padding:8px 12px; background:rgba(245, 176, 65, 0.12); border-bottom:1px solid rgba(245,176,65,0.3); text-align:center;">
+                <button id="btn-reveal-rais" class="btn-quick-join" style="height:36px; font-size:0.78rem; background:linear-gradient(135deg, #f5b041, #d48806); color:#0c0f17; font-weight:800; border:none; box-shadow:0 0 10px rgba(245,176,65,0.4);" onclick="revealRais()">
+                    👑 Rais ekanimni ochiqlash (Ovozim 2x)
+                </button>
             </div>
 
             <div id="action-panel" style="display:none; background:var(--panel); padding:8px 12px; border-bottom:1px solid var(--border);">
@@ -299,77 +299,186 @@
 
                 <!-- 3-TAB: O'YINCHILAR ROLLARI -->
                 <div id="guide-tab-roles" class="guide-tab-content" style="display: none;">
-                    <!-- MAFIA -->
+                    
+                    <!-- 1. RAIS -->
                     <div class="guide-role-card">
                         <div class="guide-role-top">
-                            <img src="https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=200&auto=format&fit=crop&q=80" class="guide-role-img">
+                            <img src="/static/roles/rais.jpg" class="guide-role-img" onerror="this.src='https://images.unsplash.com/photo-1544717305-2782549b5136?w=200&auto=format&fit=crop&q=80'">
                             <div class="guide-role-info">
-                                <div class="guide-role-name" style="color:var(--red);">🔫 MAFIA</div>
-                                <span class="guide-role-tag tag-mafia">Yovuz guruh</span>
+                                <div class="guide-role-name" style="color:var(--gold);">👑 Rais</div>
+                                <span class="guide-role-tag tag-citizen">AHOLI TOMONI • 10+ o'yinchi</span>
                             </div>
                         </div>
                         <div class="guide-role-desc">
-                            Shafqatsiz jinoyatchi. Kechasi sheriklari bilan begunohlarni yo'q qiladi. Kunduzi esa o'zini oddiy fuqarodek ko'rsatib, boshqalarga tuhmat qiladi va shubhalarni chetga buradi.
+                            Tinch aholi tomonida. O'yinda bir marta, kunduzi Rais ekaningizni ochiqlashingiz mumkin — shundan keyin ovozingiz 2 ga teng bo'ladi. Ehtiyot bo'ling: ochiqlagach, Mafia ham kim ekaningizni biladi.
                         </div>
-                        <div class="guide-role-details">
-                            <b>Qobiliyati:</b> Tunda sheriklari bilan maslahatlashib nishonga o'q uzadi.
-                            <br><b>Maqsadi:</b> Shaharni to'liq egallash va fuqarolar sonini tenglashtirish.
+                        <div class="guide-role-pills">
+                            <span class="role-pill">O'yinda 1 marta, kunduzi ochiqlaydi</span>
+                            <span class="role-pill">Ochiqlagach ovozi 2 ga teng</span>
+                            <span class="role-pill">Hamma, Mafia ham, uni taniydi</span>
+                            <span class="role-pill">Izquvarga "Mafia emas" ko'rinadi</span>
+                        </div>
+                        <div class="guide-role-maslahat">
+                            💡 <b>Maslahat:</b> Shoshilmang: hal qiluvchi ovoz berishda ochiqlang. Ochiqlaganingizdan keyin Mafia sizni nishonga oladi.
                         </div>
                     </div>
 
-                    <!-- KOMISSAR -->
+                    <!-- 2. MAFIA -->
                     <div class="guide-role-card">
                         <div class="guide-role-top">
-                            <img src="https://images.unsplash.com/photo-1541872703-74c5e44368f9?w=200&auto=format&fit=crop&q=80" class="guide-role-img">
+                            <img src="/static/roles/mafia.jpg" class="guide-role-img" onerror="this.src='https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=200&auto=format&fit=crop&q=80'">
                             <div class="guide-role-info">
-                                <div class="guide-role-name" style="color:var(--blue);">🔍 KOMISSAR (TERGOVCHI)</div>
-                                <span class="guide-role-tag tag-commissar">Qonun himoyachisi</span>
+                                <div class="guide-role-name" style="color:var(--red);">🔫 Mafia</div>
+                                <span class="guide-role-tag tag-mafia">MAFIA JAMOASI • 1–2</span>
                             </div>
                         </div>
                         <div class="guide-role-desc">
-                            Shahar tergovchisi. Har kecha bitta gumonlanuvchini tekshirib, uning Mafia yoki Tinch fuqaro ekanligini shaxsan bilib oladi.
+                            Tunda jamoadoshlari bilan qurbon tanlab, o'yindan chiqaradi va kunduzi o'zini tinch aholidek ko'rsatadi. Yutish uchun ko'proq o'yinchilarni chiqarib tashlashi kerak.
                         </div>
-                        <div class="guide-role-details">
-                            <b>Qobiliyati:</b> Tunda bitta o'yinchining kimligini tekshiradi.
-                            <br><b>Maslahat:</b> Tekshiruv natijalarini to'g'ri fursatda oching, o'zingizni birinchi kundan fosh qilib qo'ymang!
+                        <div class="guide-role-pills">
+                            <span class="role-pill">Tunda jamoa bilan qurbon tanlaydi</span>
+                            <span class="role-pill">Hamma mafia bir odamni tanlashi kerak</span>
+                            <span class="role-pill">Maxfiy mafia sheriklari bor</span>
+                        </div>
+                        <div class="guide-role-maslahat">
+                            💡 <b>Maslahat:</b> Kunduzi faol bo'ling — jim mafia tez topiladi. Boshqalarga ishonch bildiring, lekin haddan oshirmang.
                         </div>
                     </div>
 
-                    <!-- SHIFOKOR -->
+                    <!-- 3. MIRSHAB -->
                     <div class="guide-role-card">
                         <div class="guide-role-top">
-                            <img src="https://images.unsplash.com/photo-1579684385127-1ef15d508118?w=200&auto=format&fit=crop&q=80" class="guide-role-img">
+                            <img src="/static/roles/mirshab.jpg" class="guide-role-img" onerror="this.src='https://images.unsplash.com/photo-1541872703-74c5e44368f9?w=200&auto=format&fit=crop&q=80'">
                             <div class="guide-role-info">
-                                <div class="guide-role-name" style="color:var(--green);">💉 SHIFOKOR (DOCTOR)</div>
-                                <span class="guide-role-tag tag-doctor">Hayot posboni</span>
+                                <div class="guide-role-name" style="color:var(--blue);">👮 Mirshab</div>
+                                <span class="guide-role-tag tag-commissar">AHOLI TOMONI • 15+ • Pro</span>
                             </div>
                         </div>
                         <div class="guide-role-desc">
-                            Shaharning mohir shifokori. Har kecha bir kishini davolaydi. Agar o'sha kechasi Mafia unga hujum qilsa, o'yinchi tirik qoladi.
+                            Aholi tomonidagi qurolli mirshab. 2 ta o'qi bor, 1-kechadan otishi mumkin. 2-kechadan Izquvar tekshirganlarni belgilangan holda ko'radi. Ikkitagacha mafiani otishi mumkin — begunohni otsa, ishdan bo'shatiladi.
                         </div>
-                        <div class="guide-role-details">
-                            <b>Qobiliyati:</b> Tunda davolash. (Bir kishini ketma-ket ikki kecha davolay olmaydi).
-                            <br><b>Maqsadi:</b> Begunoh fuqarolar va Komissarni asrab qolish.
+                        <div class="guide-role-pills">
+                            <span class="role-pill">2 ta o'qi bor, 1-kechadan otadi</span>
+                            <span class="role-pill">2-kechadan Izquvar natijalarini ko'radi</span>
+                            <span class="role-pill">Begunohni otsa — ishdan bo'shaydi</span>
+                            <span class="role-pill">Doktor himoyasi o'qni to'sadi</span>
+                        </div>
+                        <div class="guide-role-maslahat">
+                            💡 <b>Maslahat:</b> Izquvar "Mafia" deb belgilagan o'yinchi — eng ishonchli nishon.
                         </div>
                     </div>
 
-                    <!-- TINCH FUQARO -->
+                    <!-- 4. MAFIABOSHI -->
                     <div class="guide-role-card">
                         <div class="guide-role-top">
-                            <img src="https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=200&auto=format&fit=crop&q=80" class="guide-role-img">
+                            <img src="/static/roles/mafiaboshi.jpg" class="guide-role-img" onerror="this.src='https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=200&auto=format&fit=crop&q=80'">
                             <div class="guide-role-info">
-                                <div class="guide-role-name" style="color:var(--gold);">👤 TINCH FUQARO</div>
-                                <span class="guide-role-tag tag-citizen">Aholi vakili</span>
+                                <div class="guide-role-name" style="color:var(--red);">👑 Mafiaboshi</div>
+                                <span class="guide-role-tag tag-mafia">MAFIA JAMOASI • 9+ o'yinchi</span>
+                            </div>
+                        </div>
+                        <div class="guide-role-desc">
+                            Mafialarning boshlig'i. Huddi mafiadek harakat qiladi va izquvarning tekshiruvida "Tinch Aholi" bo'lib ko'rinadi.
+                        </div>
+                        <div class="guide-role-pills">
+                            <span class="role-pill">Mafia jamoasi boshlig'i</span>
+                            <span class="role-pill">Izquvarga "Tinch aholi" ko'rinadi</span>
+                            <span class="role-pill">Qurbon tanlashda yetakchi</span>
+                        </div>
+                        <div class="guide-role-maslahat">
+                            💡 <b>Maslahat:</b> Siz Izquvardan himoyalangansiz... faolroq o'ynab, aholining ishonchini qozoning.
+                        </div>
+                    </div>
+
+                    <!-- 5. XUFYA -->
+                    <div class="guide-role-card">
+                        <div class="guide-role-top">
+                            <img src="/static/roles/xufya.jpg" class="guide-role-img" onerror="this.src='https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80'">
+                            <div class="guide-role-info">
+                                <div class="guide-role-name" style="color:#e056fd;">🕵️ Xufya</div>
+                                <span class="guide-role-tag tag-mafia">MAFIA JAMOASI • 16 • Pro</span>
+                            </div>
+                        </div>
+                        <div class="guide-role-desc">
+                            Mafiyaning josusi. Hech kimni o'ldirmaydi, lekin har kecha bitta o'yinchining aniq rolini bilib oladi. Mafiya jamoasida bo'ladi. Izquvarga "Mafia" bo'lib ko'rinadi.
+                        </div>
+                        <div class="guide-role-pills">
+                            <span class="role-pill">Har kecha 1 kishining aniq rolini biladi</span>
+                            <span class="role-pill">Qurbon tanlashda ovoz bermaydi</span>
+                            <span class="role-pill">Oxirgi mafia bo'lib qolsa — o'ldirish yo'q</span>
+                            <span class="role-pill">Izquvarga "Mafia" ko'rinadi</span>
+                        </div>
+                        <div class="guide-role-maslahat">
+                            💡 <b>Maslahat:</b> Doktor va Izquvarni toping va jamoangizga maxfiy chatda ayting.
+                        </div>
+                    </div>
+
+                    <!-- 6. IZQUVAR -->
+                    <div class="guide-role-card">
+                        <div class="guide-role-top">
+                            <img src="/static/roles/izquvar.jpg" class="guide-role-img" onerror="this.src='https://images.unsplash.com/photo-1541872703-74c5e44368f9?w=200&auto=format&fit=crop&q=80'">
+                            <div class="guide-role-info">
+                                <div class="guide-role-name" style="color:var(--blue);">🔍 Izquvar (Tergovchi)</div>
+                                <span class="guide-role-tag tag-commissar">AHOLI TOMONI • Qonun posboni</span>
+                            </div>
+                        </div>
+                        <div class="guide-role-desc">
+                            Shahar tergovchisi. Har kecha bitta gumonlanuvchini tekshirib, uning Mafia yoki Tinch aholi ekanligini shaxsan bilib oladi. (Mafiaboshi izquvarga fuqarodek ko'rinadi).
+                        </div>
+                        <div class="guide-role-pills">
+                            <span class="role-pill">Tunda 1 kishini tekshiradi</span>
+                            <span class="role-pill">Mafia yoki Fuqaroni aniqlaydi</span>
+                            <span class="role-pill">Natijalar Mirshabga ham o'tadi</span>
+                        </div>
+                        <div class="guide-role-maslahat">
+                            💡 <b>Maslahat:</b> Tekshiruv natijalarini to'g'ri fursatda oching, o'zingizni birinchi kundan fosh qilib qo'ymang!
+                        </div>
+                    </div>
+
+                    <!-- 7. DOKTOR -->
+                    <div class="guide-role-card">
+                        <div class="guide-role-top">
+                            <img src="/static/roles/doktor.jpg" class="guide-role-img" onerror="this.src='https://images.unsplash.com/photo-1579684385127-1ef15d508118?w=200&auto=format&fit=crop&q=80'">
+                            <div class="guide-role-info">
+                                <div class="guide-role-name" style="color:var(--green);">💉 Doktor (Shifokor)</div>
+                                <span class="guide-role-tag tag-doctor">AHOLI TOMONI • Hayot posboni</span>
+                            </div>
+                        </div>
+                        <div class="guide-role-desc">
+                            Shaharning mohir shifokori. Har kecha bir kishini davolaydi. Agar o'sha kechasi unga hujum qilinsa, o'yinchi tirik qoladi.
+                        </div>
+                        <div class="guide-role-pills">
+                            <span class="role-pill">Tunda bitta o'yinchini davolaydi</span>
+                            <span class="role-pill">Ketma-ket bir odamni davolay olmaydi</span>
+                            <span class="role-pill">Mafia va Mirshab o'qidan asraydi</span>
+                        </div>
+                        <div class="guide-role-maslahat">
+                            💡 <b>Maslahat:</b> O'zingizni va Izquvarni shubhali kechalarda himoya qiling!
+                        </div>
+                    </div>
+
+                    <!-- 8. TINCH AHOLI -->
+                    <div class="guide-role-card">
+                        <div class="guide-role-top">
+                            <img src="/static/roles/aholi.jpg" class="guide-role-img" onerror="this.src='https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=200&auto=format&fit=crop&q=80'">
+                            <div class="guide-role-info">
+                                <div class="guide-role-name" style="color:var(--gold);">👤 Tinch Aholi</div>
+                                <span class="guide-role-tag tag-citizen">AHOLI TOMONI • Aholi vakili</span>
                             </div>
                         </div>
                         <div class="guide-role-desc">
                             Kechasi xotirjam uxlaydi. Kunduzi esa muhokamalarda faol ishtirok etib, mafialarni fosh qiladi va ovoz berish orqali osilishga hukm qiladi.
                         </div>
-                        <div class="guide-role-details">
-                            <b>Quroli:</b> Kuzatuvchanlik, mantiq va ovoz berish huquqi.
-                            <br><b>Maqsadi:</b> Barcha mafialarni topib shaharni tozalash.
+                        <div class="guide-role-pills">
+                            <span class="role-pill">Kunduzgi muhokamada qatnashadi</span>
+                            <span class="role-pill">Ovoz berish huquqiga ega</span>
+                            <span class="role-pill">Mantiq va kuzatuvchanlik quroli</span>
+                        </div>
+                        <div class="guide-role-maslahat">
+                            💡 <b>Maslahat:</b> Emotsiyaga berilmang, faqat mantiq va dalillarga asoslanib ovoz bering!
                         </div>
                     </div>
+
                 </div>
 
                 <div style="margin-top: 10px;">
@@ -439,30 +548,6 @@
                 </div>
 
                 <button class="btn-quick-join" style="width:100%; height:38px; margin-top:10px;" onclick="closeLeaderboardModal()">Yopish</button>
-            </div>
-        </div>
-
-        <!-- 9. KUNLIK SOVG'A VA SERIYA MODALI -->
-        <div id="modal-daily-bonus" class="modal-overlay" style="display: none;" onclick="if(event.target===this) closeDailyBonusModal()">
-            <div class="modal-content-panel bonus-panel">
-                <div class="guide-modal-header">
-                    <div class="guide-modal-title">🎁 KUNLIK BONUS</div>
-                    <button class="guide-close-btn" onclick="closeDailyBonusModal()">✕</button>
-                </div>
-
-                <p style="font-size:0.75rem; color:var(--text-muted); text-align:center; margin:4px 0 10px;">
-                    Har kuni o'yinga kiring va 7 kunlik seriyani to'plang!
-                </p>
-
-                <div class="bonus-days-grid" id="bonus-days-container"></div>
-
-                <div id="bonus-claimed-msg" style="display:none; color:var(--green); font-size:0.75rem; text-align:center; margin:8px 0; font-weight:700; background:rgba(46,204,113,0.1); padding:8px; border-radius:10px;">
-                    🎉 Bugungi bonus olindi! Ertaga qaytib kiring.
-                </div>
-
-                <button id="btn-claim-bonus" class="btn-quick-join" style="width:100%; height:40px; margin-top:8px;" onclick="claimDailyBonus()">
-                    🎁 Bugungi bonusni olish (+100 coin)
-                </button>
             </div>
         </div>
     </div>

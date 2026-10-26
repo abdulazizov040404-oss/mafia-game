@@ -31,6 +31,24 @@ if (tg?.initDataUnsafe?.user) {
     }
 }
 
+function syncUserProfile() {
+    if (!userId) return;
+    const sendAvatar = (userAvatar && userAvatar.startsWith("data:")) ? "" : (userAvatar || "");
+    fetch("/api/sync_profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            user_id: userId,
+            name: userName || "O'yinchi",
+            avatar: sendAvatar
+        })
+    }).catch(() => {});
+}
+
+if (userName) {
+    syncUserProfile();
+}
+
 const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
 let ws = null;
 let currentRoomId = null;
@@ -44,24 +62,44 @@ let currentVotesData = {};
 let currentPlayersData = [];
 
 const roleAssets = {
+    rais: {
+        title: "👑 RAIS",
+        img: "/static/roles/rais.jpg",
+        desc: "Siz qishloq raisisiz (Tinch aholi tomoni)! O'yinda 1 marta kunduzi o'z rolingizni ochiqlashingiz mumkin. Shundan keyin ovozingiz 2 barobar kuchga ega bo'ladi!"
+    },
+    mafiaboshi: {
+        title: "👑 MAFIABOSHI",
+        img: "/static/roles/mafiaboshi.jpg",
+        desc: "Siz shahar mafialarining boshlig'isiz! Jamoadoshlaringiz bilan birgalikda begunohlarni yo'q qiling. Eng asosiysi: Izquvar tekshirganida siz «Tinch aholi» bo'lib ko'rinasiz!"
+    },
+    mirshab: {
+        title: "👮 MIRSHAB",
+        img: "/static/roles/mirshab.jpg",
+        desc: "Siz qurolli mirshabsiz (Tinch aholi tomoni)! 2 ta o'qingiz bor, 1-kechadan otishingiz mumkin. 2-kechadan Izquvar tekshiruvlarini ko'rasiz. Ehtiyot bo'ling: begunohni otsangiz ishdan bo'shatilasiz!"
+    },
+    xufya: {
+        title: "🕵️ XUFYA",
+        img: "/static/roles/xufya.jpg",
+        desc: "Siz mafiyaning maxfiy josusisiz! Hech kimni o'ldirmaysiz, lekin har kecha bitta odamning aniq rolini bilib olasiz. Izquvarga Mafia bo'lib ko'rinasiz."
+    },
     mafia: {
         title: "🔫 MAFIA",
-        img: "https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=600&auto=format&fit=crop&q=80",
-        desc: "Siz shafqatsiz mafiasiz! Tunda sheriklaringiz bilan birgalikda begunohlarni yo'q qiling. Kunduzi o'zingizni oddiy fuqarodek tuting."
+        img: "/static/roles/mafia.jpg",
+        desc: "Siz shafqatsiz mafiasiz! Tunda jamoadoshlaringiz bilan birgalikda begunohlarni yo'q qiling. Kunduzi o'zingizni oddiy fuqarodek tuting."
     },
     doctor: {
-        title: "💉 SHIFOKOR",
-        img: "https://images.unsplash.com/photo-1579684385127-1ef15d508118?w=600&auto=format&fit=crop&q=80",
-        desc: "Siz shahar shifokorisisiz! Tunda kimnidir davolang va uni mafianing o'qidan asrab qoling. Bir odamni ketma-ket ikki kecha davolay olmaysiz."
+        title: "💉 DOKTOR (SHIFOKOR)",
+        img: "/static/roles/doktor.jpg",
+        desc: "Siz shahar shifokorisisiz! Tunda kimnidir davolang va uni tungi suiqasddan asrab qoling. Bir odamni ketma-ket ikki kecha davolay olmaysiz."
     },
     commissar: {
-        title: "🔍 KOMISSAR",
-        img: "https://images.unsplash.com/photo-1541872703-74c5e44368f9?w=600&auto=format&fit=crop&q=80",
-        desc: "Siz tergovchisiz! Har kecha bitta odamni tekshirib, uning mafia yoki tinch fuqaro ekanini aniqlaysiz."
+        title: "🔍 IZQUVAR (TERGOVCHI)",
+        img: "/static/roles/izquvar.jpg",
+        desc: "Siz shahar tergovchisisiz! Har kecha bitta odamni tekshirib, uning mafia yoki tinch fuqaro ekanini aniqlaysiz. (Mafiaboshi fuqaro bo'lib ko'rinadi)."
     },
     citizen: {
-        title: "👤 TINCH FUQARO",
-        img: "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=600&auto=format&fit=crop&q=80",
+        title: "👤 TINCH AHOLI",
+        img: "/static/roles/aholi.jpg",
         desc: "Siz tinch aholi vakilisiz. Muhokamada qatnashib, haqiqiy mafialarni topib osishga ovoz bering!"
     }
 };
@@ -169,6 +207,8 @@ function saveProfile() {
     localStorage.setItem("mafia_avatar", userAvatar);
     document.getElementById("modal-profile").style.display = "none";
 
+    syncUserProfile();
+
     if (ws && ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({
             action: "update_profile",
@@ -263,28 +303,14 @@ function verifySubscription(isManual = false) {
 }
 
 // ==========================================
-// REYTING VA TOP O'YINCHILAR
+// REYTING VA TOP O'YINCHILAR (FAQAT HAQIQIY O'YINCHILAR)
 // ==========================================
-const sampleLeaderboard = [
-    { rank: "🥇", name: "Don Karleone", role: "👑 Afsona Mafia", wins: 148, rate: "88%" },
-    { rank: "🥈", name: "Sherlok", role: "🔍 Bosh Komissar", wins: 124, rate: "79%" },
-    { rank: "🥉", name: "Dr. House", role: "💉 Bosh Shifokor", wins: 109, rate: "74%" },
-    { rank: "4", name: "Jasur", role: "🔫 Mafia Snayper", wins: 84, rate: "68%" },
-    { rank: "5", name: "Sardor", role: "👤 Shahar Faxri", wins: 71, rate: "63%" },
-    { rank: "6", name: "Malika", role: "🔍 Tergovchi", wins: 62, rate: "59%" },
-    { rank: "7", name: "Bekzod", role: "👤 Fuqaro", wins: 53, rate: "54%" }
-];
+let currentLeaderboardTab = "top";
 
 function openLeaderboardModal() {
-    renderLeaderboard("top");
-    document.getElementById("lb-my-name").innerText = userName || "O'yinchi";
-    fetch(`/api/profile/${userId}`)
-        .then(r => r.json())
-        .then(d => {
-            document.getElementById("lb-my-wins").innerText = (d.wins || 0) + " g'alaba";
-        })
-        .catch(() => {});
+    syncUserProfile();
     document.getElementById("modal-leaderboard").style.display = "flex";
+    switchLeaderboardTab(currentLeaderboardTab);
 }
 
 function closeLeaderboardModal() {
@@ -292,115 +318,83 @@ function closeLeaderboardModal() {
 }
 
 function switchLeaderboardTab(type) {
-    document.getElementById("lb-tab-top").classList.toggle("active", type === "top");
-    document.getElementById("lb-tab-mafia").classList.toggle("active", type === "mafia");
-    renderLeaderboard(type);
+    currentLeaderboardTab = type;
+    const tabTop = document.getElementById("lb-tab-top");
+    const tabMafia = document.getElementById("lb-tab-mafia");
+    if (tabTop) tabTop.classList.toggle("active", type === "top");
+    if (tabMafia) tabMafia.classList.toggle("active", type === "mafia");
+    loadLeaderboardData(type);
 }
 
-function renderLeaderboard(type) {
+async function loadLeaderboardData(type) {
     const box = document.getElementById("lb-list-box");
-    box.innerHTML = "";
-    const list = type === "mafia" 
-        ? sampleLeaderboard.filter(x => x.role.includes("Mafia") || x.rank === "🥇" || x.rank === "4")
-        : sampleLeaderboard;
-
-    list.forEach((p, idx) => {
-        const item = document.createElement("div");
-        item.className = `leaderboard-item ${idx === 0 ? 'top-1' : ''}`;
-        item.innerHTML = `
-            <span class="lb-rank-badge">${p.rank}</span>
-            <img src="${presetAvatars[idx % presetAvatars.length]}" class="lb-avatar">
-            <div class="lb-info">
-                <div class="lb-name">${p.name}</div>
-                <div class="lb-role-title">${p.role}</div>
-            </div>
-            <div class="lb-score">${p.wins} win<br><span style="font-size:0.65rem; color:var(--text-muted);">${p.rate}</span></div>
-        `;
-        box.appendChild(item);
-    });
-}
-
-// ==========================================
-// KUNLIK SOVG'A VA SERIYA
-// ==========================================
-const dailyRewards = [
-    { day: 1, reward: "+50 🪙", icon: "🪙" },
-    { day: 2, reward: "+100 🪙", icon: "🪙" },
-    { day: 3, reward: "+150 🪙", icon: "💰" },
-    { day: 4, reward: "+200 🪙", icon: "💰" },
-    { day: 5, reward: "+300 🪙", icon: "💎" },
-    { day: 6, reward: "+500 🪙", icon: "💎" },
-    { day: 7, reward: "👑 VIP", icon: "👑" }
-];
-
-function getBonusState() {
-    const today = new Date().toISOString().slice(0, 10);
-    const lastClaim = localStorage.getItem("mafia_last_bonus_date");
-    let streak = parseInt(localStorage.getItem("mafia_streak") || "1", 10);
-    if (isNaN(streak) || streak < 1) streak = 1;
-    const isClaimedToday = (lastClaim === today);
-    return { today, lastClaim, streak, isClaimedToday };
-}
-
-function openDailyBonusModal() {
-    renderDailyBonusGrid();
-    document.getElementById("modal-daily-bonus").style.display = "flex";
-}
-
-function closeDailyBonusModal() {
-    document.getElementById("modal-daily-bonus").style.display = "none";
-}
-
-function renderDailyBonusGrid() {
-    const { streak, isClaimedToday } = getBonusState();
-    const box = document.getElementById("bonus-days-container");
     if (!box) return;
-    box.innerHTML = "";
+    box.innerHTML = `
+        <div style="text-align:center; padding:30px 10px; color:var(--text-muted); font-size:0.8rem;">
+            ⏳ Haqiqiy o'yinchilar reytingi yuklanmoqda...
+        </div>
+    `;
 
-    dailyRewards.forEach(r => {
-        const isPast = r.day < streak || (r.day === streak && isClaimedToday);
-        const isCurrent = (r.day === streak && !isClaimedToday);
-        const card = document.createElement("div");
-        card.className = `bonus-day-card ${isPast ? 'claimed' : ''} ${isCurrent ? 'today' : ''}`;
-        card.innerHTML = `
-            <span class="bonus-day-num">${r.day}-kun</span>
-            <span class="bonus-day-icon">${isPast ? '✅' : r.icon}</span>
-            <span class="bonus-day-reward">${r.reward}</span>
-        `;
-        box.appendChild(card);
-    });
+    try {
+        const resp = await fetch(`/api/leaderboard?type=${encodeURIComponent(type)}&user_id=${encodeURIComponent(userId)}`);
+        const data = await resp.json();
+        const players = data.players || [];
+        const myRank = data.my_rank || {};
 
-    const btn = document.getElementById("btn-claim-bonus");
-    const msg = document.getElementById("bonus-claimed-msg");
-    const streakTitle = document.getElementById("streak-banner-title");
-    const streakBtn = document.getElementById("streak-banner-btn");
-
-    if (streakTitle) streakTitle.innerText = `🔥 ${streak} kunlik seriya`;
-
-    if (isClaimedToday) {
-        if (btn) btn.style.display = "none";
-        if (msg) msg.style.display = "block";
-        if (streakBtn) streakBtn.innerText = "Bugun: Olingan ✅";
-    } else {
-        if (btn) {
-            btn.style.display = "block";
-            btn.innerText = `🎁 ${streak}-kun bonusini olish (${dailyRewards[streak - 1]?.reward || '+100 coin'})`;
+        // Mening o'rnim bannerini yangilash
+        const myNameEl = document.getElementById("lb-my-name");
+        const myWinsEl = document.getElementById("lb-my-wins");
+        if (myNameEl) {
+            const rankLabel = myRank.rank ? ` (#${myRank.rank})` : "";
+            myNameEl.innerText = (myRank.name || userName || "O'yinchi") + rankLabel;
         }
-        if (msg) msg.style.display = "none";
-        if (streakBtn) streakBtn.innerText = "🎁 Sovg'ani olish ›";
+        if (myWinsEl) {
+            myWinsEl.innerText = `${myRank.wins || 0} g'alaba`;
+        }
+
+        if (players.length === 0) {
+            box.innerHTML = `
+                <div style="text-align:center; padding:35px 15px; color:var(--text-muted); font-size:0.82rem;">
+                    🏆 Hozircha reytingda o'yinlar ro'yxatga olinmagan.<br>
+                    <span style="font-size:0.75rem; color:var(--gold); display:inline-block; margin-top:6px;">
+                        O'yinga kiring va birinchi bo'lib g'alaba qozoning!
+                    </span>
+                </div>
+            `;
+            return;
+        }
+
+        box.innerHTML = "";
+        players.forEach((p, idx) => {
+            const isMe = (String(p.user_id) === String(userId));
+            const item = document.createElement("div");
+            item.className = `leaderboard-item ${idx === 0 ? 'top-1' : ''} ${isMe ? 'is-me' : ''}`;
+            const avatarSrc = p.avatar || presetAvatars[idx % presetAvatars.length];
+
+            item.innerHTML = `
+                <span class="lb-rank-badge">${p.rank}</span>
+                <img src="${avatarSrc}" class="lb-avatar" onerror="this.src='${presetAvatars[0]}'">
+                <div class="lb-info">
+                    <div class="lb-name">
+                        ${p.name} ${isMe ? '<span class="lb-me-tag">Siz</span>' : ''}
+                    </div>
+                    <div class="lb-role-title">${p.role}</div>
+                </div>
+                <div class="lb-score">
+                    ${p.score_text}<br>
+                    <span style="font-size:0.65rem; color:var(--text-muted);">${p.rate}</span>
+                </div>
+            `;
+            box.appendChild(item);
+        });
+
+    } catch (e) {
+        box.innerHTML = `
+            <div style="text-align:center; padding:30px; color:var(--text-muted); font-size:0.8rem;">
+                ⚠️ Reytingni yuklashda xatolik yuz berdi.
+            </div>
+        `;
     }
-}
-
-function claimDailyBonus() {
-    const { today, streak, isClaimedToday } = getBonusState();
-    if (isClaimedToday) return;
-
-    localStorage.setItem("mafia_last_bonus_date", today);
-    const nextStreak = streak >= 7 ? 1 : streak + 1;
-    localStorage.setItem("mafia_streak", nextStreak.toString());
-
-    alert(`🎉 Tabriklaymiz! Siz ${dailyRewards[streak - 1]?.reward || '+100 coin'} mukofotini qo'lga kiritdingiz!`);
-    renderDailyBonusGrid();
 }
 
 function openCreateRoomModal() {
@@ -564,8 +558,11 @@ function joinRoom(roomId) {
             document.getElementById("role-img-card").src = r.img;
             document.getElementById("role-title-card").innerText = r.title;
             let desc = r.desc;
-            if (myRole === "mafia" && d.partners && d.partners.length > 0) {
+            if (["mafia", "mafiaboshi", "xufya"].includes(myRole) && d.partners && d.partners.length > 0) {
                 desc += "\n\n👥 Sizning mafia sheriklaringiz: " + d.partners.join(", ");
+            }
+            if (myRole === "mirshab") {
+                desc += "\n\n🎯 Sizda 2 ta o'q bor! Begunoh fuqaroni otsangiz, ishdan bo'shatilasiz.";
             }
             document.getElementById("role-desc-card").innerText = desc;
             document.getElementById("modal-role").style.display = "flex";
@@ -642,6 +639,8 @@ function handlePhaseChange(d) {
     const actBox = document.getElementById("action-buttons-box");
     const restartBtn = document.getElementById("host-restart-btn");
     const startBtn = document.getElementById("host-start-btn");
+    const raisBar = document.getElementById("rais-action-bar");
+    const appWrapper = document.querySelector(".app-wrapper");
     
     actBox.innerHTML = "";
     currentVotesData = {};
@@ -650,10 +649,28 @@ function handlePhaseChange(d) {
     isLastWordPhase = (d.phase === "last_word");
     lastWordSpeakerId = d.speaker_id || null;
 
+    // Orqa fonni kun/tun fazasiga qarab siljitish
+    if (d.phase === "night") {
+        if (appWrapper) {
+            appWrapper.classList.remove("phase-day");
+            appWrapper.classList.add("phase-night");
+        }
+    } else if (d.phase === "discussion" || d.phase === "voting") {
+        if (appWrapper) {
+            appWrapper.classList.remove("phase-night");
+            appWrapper.classList.add("phase-day");
+        }
+    } else {
+        if (appWrapper) {
+            appWrapper.classList.remove("phase-night", "phase-day");
+        }
+    }
+
     if (d.phase === "lobby") {
         badge.innerText = "Kutish zali";
         badge.style.color = "var(--gold)";
         actPanel.style.display = "none";
+        if (raisBar) raisBar.style.display = "none";
         if (restartBtn) restartBtn.style.display = "none";
         updateHostStartButtonVisibility();
     }
@@ -663,10 +680,21 @@ function handlePhaseChange(d) {
         actPanel.style.display = "none";
         if (startBtn) startBtn.style.display = "none";
         if (restartBtn) restartBtn.style.display = "none";
+
+        // Rais ochiqlash tugmasi
+        const me = currentPlayersData.find(p => p.id === userId);
+        if (raisBar) {
+            raisBar.style.display = (myRole === "rais" && isAlive && me && !me.rais_revealed) ? "block" : "none";
+        }
     }
     else if (d.phase === "voting" || d.phase === "revoting") {
         badge.innerText = "🗳 Ovoz berish (30s)";
         badge.style.color = "var(--blue)";
+        const me = currentPlayersData.find(p => p.id === userId);
+        if (raisBar) {
+            raisBar.style.display = (myRole === "rais" && isAlive && me && !me.rais_revealed) ? "block" : "none";
+        }
+
         if (isAlive) {
             actPanel.style.display = "block";
             document.getElementById("action-title").innerText = "Gumonlanuvchini tanlang:";
@@ -687,11 +715,51 @@ function handlePhaseChange(d) {
     else if (d.phase === "night") {
         badge.innerText = "🌙 Tun bosqichi";
         badge.style.color = "#a55eea";
-        if (isAlive && ["mafia", "doctor", "commissar"].includes(myRole)) {
+        if (raisBar) raisBar.style.display = "none";
+
+        const activeNightRoles = ["mafia", "mafiaboshi", "doctor", "commissar", "mirshab", "xufya"];
+        if (isAlive && activeNightRoles.includes(myRole)) {
+            // Agar Mirshab ishdan bo'shatilgan yoki o'qi tugagan bo'lsa
+            if (myRole === "mirshab" && (d.disarmed || (d.bullets !== undefined && d.bullets <= 0))) {
+                actPanel.style.display = "none";
+                return;
+            }
+
             actPanel.style.display = "block";
-            document.getElementById("action-title").innerText = 
-                myRole === "mafia" ? "Mafia nishoni:" : (myRole === "doctor" ? "Davolash:" : "Tekshirish:");
+            let titleText = "Nishonni tanlang:";
+            if (myRole === "mafia") {
+                titleText = "🔫 Mafia nishoni (Qurbonni tanlang):";
+            } else if (myRole === "mafiaboshi") {
+                titleText = "👑 Mafiaboshi nishoni (Qurbonni tanlang):";
+            } else if (myRole === "doctor") {
+                titleText = "💉 Davolash: Kimni o'limdan qutqarasiz?";
+            } else if (myRole === "commissar") {
+                titleText = "🔍 Izquvar: Kimning kimligini tekshirasiz?";
+            } else if (myRole === "mirshab") {
+                const bCount = d.bullets !== undefined ? d.bullets : 2;
+                titleText = `👮 Mirshab: Nishonga o'q uzish (${bCount} ta o'q):`;
+            } else if (myRole === "xufya") {
+                titleText = "🕵️ Xufya (Josus): Kimning aniq rolini bilmoqchisiz?";
+            }
+
+            document.getElementById("action-title").innerText = titleText;
+
+            // Agar Mirshab bo'lsa va Izquvar ma'lumotlari bo'lsa, eslatma
+            if (myRole === "mirshab" && d.izquvar_hints && Object.keys(d.izquvar_hints).length > 0) {
+                const hintDiv = document.createElement("div");
+                hintDiv.style.cssText = "font-size:0.72rem; color:var(--gold); margin-bottom:6px; background:rgba(245,176,65,0.1); padding:4px 8px; border-radius:6px; width:100%;";
+                let hintsList = [];
+                for (const h of Object.values(d.izquvar_hints)) {
+                    hintsList.push(`${h.name} (${h.is_mafia ? '🚨 Mafia' : '👤 Fuqaro'})`);
+                }
+                hintDiv.innerHTML = `🔍 <b>Izquvar natijalari:</b> ${hintsList.join(", ")}`;
+                actBox.appendChild(hintDiv);
+            }
+
             (d.targets || []).forEach(t => {
+                if (["mafia", "mafiaboshi", "commissar", "xufya"].includes(myRole) && t.id === userId) {
+                    return;
+                }
                 const b = document.createElement("button");
                 b.className = "time-tab-btn";
                 b.innerText = t.name;
@@ -701,21 +769,44 @@ function handlePhaseChange(d) {
                 };
                 actBox.appendChild(b);
             });
+
+            // Mirshab uchun bu tunda otmaslik (skip)
+            if (myRole === "mirshab") {
+                const skipBtn = document.createElement("button");
+                skipBtn.className = "time-tab-btn";
+                skipBtn.style.color = "var(--text-muted)";
+                skipBtn.innerText = "⏭ Bu kecha otmaslik";
+                skipBtn.onclick = () => {
+                    actPanel.style.display = "none";
+                };
+                actBox.appendChild(skipBtn);
+            }
         }
     }
     else if (d.phase === "last_word") {
         badge.innerText = "🎤 OXIRGI SO'Z BOSQICHI";
         badge.style.color = "var(--red)";
         actPanel.style.display = "none";
+        if (raisBar) raisBar.style.display = "none";
     }
     else if (d.phase === "game_over") {
-        const isWin = (d.winner === "mafia" && myRole === "mafia") || (d.winner === "citizens" && myRole !== "mafia");
+        const isMafiaGroup = ["mafia", "mafiaboshi", "xufya"].includes(myRole);
+        const isWin = (d.winner === "mafia" && isMafiaGroup) || (d.winner === "citizens" && !isMafiaGroup);
         badge.innerText = isWin ? "🏆 SIZ G'ALABA QOZONDINGIZ!" : "💀 O'YIN TUGADI";
         badge.style.color = isWin ? "var(--green)" : "var(--red)";
         actPanel.style.display = "none";
+        if (raisBar) raisBar.style.display = "none";
         if (isHost && restartBtn) {
             restartBtn.style.display = "block";
         }
+    }
+}
+
+function revealRais() {
+    if (ws && myRole === "rais") {
+        ws.send(JSON.stringify({ action: "reveal_rais" }));
+        const rBar = document.getElementById("rais-action-bar");
+        if (rBar) rBar.style.display = "none";
     }
 }
 
@@ -727,6 +818,7 @@ function restartGame() {
 
 function renderHorizontalPlayers() {
     const box = document.getElementById("players-horizontal");
+    if (!box) return;
     box.innerHTML = "";
     currentPlayersData.forEach(p => {
         const col = document.createElement("div");
@@ -738,8 +830,11 @@ function renderHorizontalPlayers() {
         }
 
         col.innerHTML = `
-            <img src="${p.avatar || presetAvatars[0]}" class="player-avatar-circle">
-            <span class="player-bubble-name">${p.name}</span>
+            <div style="position:relative; display:inline-block;">
+                <img src="${p.avatar || presetAvatars[0]}" class="player-avatar-circle">
+                ${p.rais_revealed ? '<span style="position:absolute; bottom:-3px; right:-3px; font-size:0.75rem;" title="Rais (Ovozi 2x)">👑</span>' : ''}
+            </div>
+            <span class="player-bubble-name">${p.rais_revealed ? '👑 ' : ''}${p.name}</span>
             ${voteCount > 0 ? `<span class="vote-badge-count">${voteCount}</span>` : ''}
         `;
         box.appendChild(col);
@@ -821,4 +916,3 @@ function leaveRoomLocally() {
 refreshRooms();
 setInterval(refreshRooms, 4000);
 checkInitialSubscription();
-renderDailyBonusGrid();

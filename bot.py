@@ -47,7 +47,7 @@ if TG_BOT_TOKEN == "SIZNING_BOT_TOKENINGIZ":
 CHANNEL_ID = os.getenv("CHANNEL_ID", "@durbeh").strip()
 CHANNEL_URL = os.getenv("CHANNEL_URL", "https://t.me/durbeh").strip()
 WEB_APP_URL = os.getenv("WEB_APP_URL", "https://SIZNING_RENDER_URL.onrender.com").strip()
-REQUIRE_SUB = os.getenv("REQUIRE_SUB", "false").lower() in ["true", "1", "yes"]
+REQUIRE_SUB = os.getenv("REQUIRE_SUB", "true").lower() in ["true", "1", "yes"]
 
 app = FastAPI()
 
@@ -67,6 +67,38 @@ async def get_style_css():
 @app.get("/bot.js")
 async def get_bot_js():
     return FileResponse("static/bot.js")
+
+@app.get("/api/channel_info")
+async def get_channel_info():
+    return JSONResponse({
+        "channel_id": CHANNEL_ID,
+        "channel_url": CHANNEL_URL,
+        "require_sub": REQUIRE_SUB
+    })
+
+@app.get("/api/check_sub")
+async def check_sub_endpoint(user_id: str = Query(...)):
+    if not REQUIRE_SUB or not CHANNEL_ID or not TG_BOT_TOKEN:
+        return JSONResponse({"subscribed": True, "required": False})
+
+    clean_id = str(user_id).strip()
+    if not clean_id.isdigit():
+        return JSONResponse({
+            "subscribed": False,
+            "required": True,
+            "channel_url": CHANNEL_URL,
+            "channel_id": CHANNEL_ID,
+            "is_test_id": True
+        })
+
+    async with httpx.AsyncClient(timeout=8.0) as client:
+        is_sub = await check_telegram_subscription(client, int(clean_id))
+        return JSONResponse({
+            "subscribed": is_sub,
+            "required": True,
+            "channel_url": CHANNEL_URL,
+            "channel_id": CHANNEL_ID
+        })
 
 stats_db: Dict[str, dict] = {}
 

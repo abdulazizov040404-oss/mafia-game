@@ -188,7 +188,227 @@ function selectTime(sec) {
     document.getElementById(`tab-${sec}`).classList.add("active");
 }
 
+// ==========================================
+// KANAL OBUNASI VA TEKSHIRISH
+// ==========================================
+let isSubscribed = false;
+let channelUrl = "https://t.me/durbeh";
+let channelId = "@durbeh";
+let requireSub = true;
+
+function checkInitialSubscription() {
+    fetch("/api/channel_info")
+        .then(r => r.json())
+        .then(info => {
+            if (info.channel_url) channelUrl = info.channel_url;
+            if (info.channel_id) channelId = info.channel_id;
+            requireSub = info.require_sub;
+            const handleEl = document.getElementById("sub-channel-handle");
+            if (handleEl) handleEl.innerText = channelId;
+
+            if (!requireSub) {
+                isSubscribed = true;
+                return;
+            }
+
+            fetch(`/api/check_sub?user_id=${userId}`)
+                .then(r => r.json())
+                .then(d => {
+                    isSubscribed = d.subscribed;
+                    if (!isSubscribed) {
+                        document.getElementById("modal-channel-sub").style.display = "flex";
+                    }
+                })
+                .catch(() => {});
+        })
+        .catch(() => {});
+}
+
+function openChannelLink() {
+    if (tg && tg.openTelegramLink) {
+        tg.openTelegramLink(channelUrl);
+    } else {
+        window.open(channelUrl, "_blank");
+    }
+}
+
+function verifySubscription(isManual = false) {
+    const btn = document.getElementById("btn-check-sub");
+    if (btn) btn.innerText = "⏳ Tekshirilmoqda...";
+
+    fetch(`/api/check_sub?user_id=${userId}`)
+        .then(r => r.json())
+        .then(d => {
+            if (btn) btn.innerText = "✅ A'zo bo'ldim (Tekshirish)";
+            if (d.subscribed) {
+                isSubscribed = true;
+                document.getElementById("sub-error-msg").style.display = "none";
+                document.getElementById("sub-success-msg").style.display = "block";
+                setTimeout(() => {
+                    document.getElementById("modal-channel-sub").style.display = "none";
+                    document.getElementById("sub-success-msg").style.display = "none";
+                }, 800);
+            } else {
+                isSubscribed = false;
+                document.getElementById("sub-success-msg").style.display = "none";
+                document.getElementById("sub-error-msg").style.display = "block";
+                if (isManual) {
+                    alert("❌ Siz hali " + channelId + " kanaliga a'zo bo'lmadingiz! Iltimos, oldin kanalga a'zo bo'ling.");
+                }
+            }
+        })
+        .catch(() => {
+            if (btn) btn.innerText = "✅ A'zo bo'ldim (Tekshirish)";
+        });
+}
+
+// ==========================================
+// REYTING VA TOP O'YINCHILAR
+// ==========================================
+const sampleLeaderboard = [
+    { rank: "🥇", name: "Don Karleone", role: "👑 Afsona Mafia", wins: 148, rate: "88%" },
+    { rank: "🥈", name: "Sherlok", role: "🔍 Bosh Komissar", wins: 124, rate: "79%" },
+    { rank: "🥉", name: "Dr. House", role: "💉 Bosh Shifokor", wins: 109, rate: "74%" },
+    { rank: "4", name: "Jasur", role: "🔫 Mafia Snayper", wins: 84, rate: "68%" },
+    { rank: "5", name: "Sardor", role: "👤 Shahar Faxri", wins: 71, rate: "63%" },
+    { rank: "6", name: "Malika", role: "🔍 Tergovchi", wins: 62, rate: "59%" },
+    { rank: "7", name: "Bekzod", role: "👤 Fuqaro", wins: 53, rate: "54%" }
+];
+
+function openLeaderboardModal() {
+    renderLeaderboard("top");
+    document.getElementById("lb-my-name").innerText = userName || "O'yinchi";
+    fetch(`/api/profile/${userId}`)
+        .then(r => r.json())
+        .then(d => {
+            document.getElementById("lb-my-wins").innerText = (d.wins || 0) + " g'alaba";
+        })
+        .catch(() => {});
+    document.getElementById("modal-leaderboard").style.display = "flex";
+}
+
+function closeLeaderboardModal() {
+    document.getElementById("modal-leaderboard").style.display = "none";
+}
+
+function switchLeaderboardTab(type) {
+    document.getElementById("lb-tab-top").classList.toggle("active", type === "top");
+    document.getElementById("lb-tab-mafia").classList.toggle("active", type === "mafia");
+    renderLeaderboard(type);
+}
+
+function renderLeaderboard(type) {
+    const box = document.getElementById("lb-list-box");
+    box.innerHTML = "";
+    const list = type === "mafia" 
+        ? sampleLeaderboard.filter(x => x.role.includes("Mafia") || x.rank === "🥇" || x.rank === "4")
+        : sampleLeaderboard;
+
+    list.forEach((p, idx) => {
+        const item = document.createElement("div");
+        item.className = `leaderboard-item ${idx === 0 ? 'top-1' : ''}`;
+        item.innerHTML = `
+            <span class="lb-rank-badge">${p.rank}</span>
+            <img src="${presetAvatars[idx % presetAvatars.length]}" class="lb-avatar">
+            <div class="lb-info">
+                <div class="lb-name">${p.name}</div>
+                <div class="lb-role-title">${p.role}</div>
+            </div>
+            <div class="lb-score">${p.wins} win<br><span style="font-size:0.65rem; color:var(--text-muted);">${p.rate}</span></div>
+        `;
+        box.appendChild(item);
+    });
+}
+
+// ==========================================
+// KUNLIK SOVG'A VA SERIYA
+// ==========================================
+const dailyRewards = [
+    { day: 1, reward: "+50 🪙", icon: "🪙" },
+    { day: 2, reward: "+100 🪙", icon: "🪙" },
+    { day: 3, reward: "+150 🪙", icon: "💰" },
+    { day: 4, reward: "+200 🪙", icon: "💰" },
+    { day: 5, reward: "+300 🪙", icon: "💎" },
+    { day: 6, reward: "+500 🪙", icon: "💎" },
+    { day: 7, reward: "👑 VIP", icon: "👑" }
+];
+
+function getBonusState() {
+    const today = new Date().toISOString().slice(0, 10);
+    const lastClaim = localStorage.getItem("mafia_last_bonus_date");
+    let streak = parseInt(localStorage.getItem("mafia_streak") || "1", 10);
+    if (isNaN(streak) || streak < 1) streak = 1;
+    const isClaimedToday = (lastClaim === today);
+    return { today, lastClaim, streak, isClaimedToday };
+}
+
+function openDailyBonusModal() {
+    renderDailyBonusGrid();
+    document.getElementById("modal-daily-bonus").style.display = "flex";
+}
+
+function closeDailyBonusModal() {
+    document.getElementById("modal-daily-bonus").style.display = "none";
+}
+
+function renderDailyBonusGrid() {
+    const { streak, isClaimedToday } = getBonusState();
+    const box = document.getElementById("bonus-days-container");
+    if (!box) return;
+    box.innerHTML = "";
+
+    dailyRewards.forEach(r => {
+        const isPast = r.day < streak || (r.day === streak && isClaimedToday);
+        const isCurrent = (r.day === streak && !isClaimedToday);
+        const card = document.createElement("div");
+        card.className = `bonus-day-card ${isPast ? 'claimed' : ''} ${isCurrent ? 'today' : ''}`;
+        card.innerHTML = `
+            <span class="bonus-day-num">${r.day}-kun</span>
+            <span class="bonus-day-icon">${isPast ? '✅' : r.icon}</span>
+            <span class="bonus-day-reward">${r.reward}</span>
+        `;
+        box.appendChild(card);
+    });
+
+    const btn = document.getElementById("btn-claim-bonus");
+    const msg = document.getElementById("bonus-claimed-msg");
+    const streakTitle = document.getElementById("streak-banner-title");
+    const streakBtn = document.getElementById("streak-banner-btn");
+
+    if (streakTitle) streakTitle.innerText = `🔥 ${streak} kunlik seriya`;
+
+    if (isClaimedToday) {
+        if (btn) btn.style.display = "none";
+        if (msg) msg.style.display = "block";
+        if (streakBtn) streakBtn.innerText = "Bugun: Olingan ✅";
+    } else {
+        if (btn) {
+            btn.style.display = "block";
+            btn.innerText = `🎁 ${streak}-kun bonusini olish (${dailyRewards[streak - 1]?.reward || '+100 coin'})`;
+        }
+        if (msg) msg.style.display = "none";
+        if (streakBtn) streakBtn.innerText = "🎁 Sovg'ani olish ›";
+    }
+}
+
+function claimDailyBonus() {
+    const { today, streak, isClaimedToday } = getBonusState();
+    if (isClaimedToday) return;
+
+    localStorage.setItem("mafia_last_bonus_date", today);
+    const nextStreak = streak >= 7 ? 1 : streak + 1;
+    localStorage.setItem("mafia_streak", nextStreak.toString());
+
+    alert(`🎉 Tabriklaymiz! Siz ${dailyRewards[streak - 1]?.reward || '+100 coin'} mukofotini qo'lga kiritdingiz!`);
+    renderDailyBonusGrid();
+}
+
 function openCreateRoomModal() {
+    if (!isSubscribed && requireSub) {
+        document.getElementById("modal-channel-sub").style.display = "flex";
+        alert("O'yin xonasini yaratish uchun avval rasmiy kanalimizga obuna bo'ling!");
+        return;
+    }
     if (!userName || userName.length > 6) {
         openProfile(true);
         return;
@@ -255,6 +475,11 @@ function refreshRooms() {
 }
 
 function quickJoin() {
+    if (!isSubscribed && requireSub) {
+        document.getElementById("modal-channel-sub").style.display = "flex";
+        alert("Tezkor qo'shilish uchun avval rasmiy kanalimizga obuna bo'ling!");
+        return;
+    }
     if (!userName || userName.length > 6) {
         openProfile(true);
         return;
@@ -268,6 +493,11 @@ function quickJoin() {
 }
 
 function confirmCreateRoom() {
+    if (!isSubscribed && requireSub) {
+        document.getElementById("modal-channel-sub").style.display = "flex";
+        alert("Xona yaratish uchun avval rasmiy kanalimizga obuna bo'ling!");
+        return;
+    }
     const rName = document.getElementById("cr-room-name").value.trim() || "Bordo xona";
     const hostAva = userAvatar.startsWith("data:") ? presetAvatars[0] : userAvatar;
     fetch("/api/create_room", {
@@ -288,6 +518,11 @@ function confirmCreateRoom() {
 }
 
 function joinRoom(roomId) {
+    if (!isSubscribed && requireSub) {
+        document.getElementById("modal-channel-sub").style.display = "flex";
+        alert("O'yinga kirish uchun avval rasmiy kanalimizga obuna bo'ling!");
+        return;
+    }
     currentRoomId = roomId;
     isAlive = true;
     document.getElementById("screen-home").style.display = "none";
@@ -585,3 +820,5 @@ function leaveRoomLocally() {
 
 refreshRooms();
 setInterval(refreshRooms, 4000);
+checkInitialSubscription();
+renderDailyBonusGrid();

@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Mafia Online</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <link rel="stylesheet" href="style.css?v=3.1">
-    <link rel="stylesheet" href="/static/style.css?v=3.1">
+    <link rel="stylesheet" href="style.css?v=3.2">
+    <link rel="stylesheet" href="/static/style.css?v=3.2">
 </head>
 <body>
     <div class="app-wrapper">
@@ -19,11 +19,11 @@
             </header>
 
             <div class="gold-icons-bar">
-                <div class="gold-icon-btn" onclick="toggleTheme()" title="Mavzu">☀️</div>
-                <div class="gold-icon-btn" onclick="refreshRooms()" title="Yangilash">⏳</div>
-                <div class="gold-icon-btn" onclick="openGuideModal('rules')" title="O'yin qo'llanmasi">📖</div>
-                <div class="gold-icon-btn" onclick="openProfile(false)" title="Yutuqlar">🏆</div>
-                <div class="gold-icon-btn" onclick="refreshRooms()" title="Xonalar">⛺</div>
+                <button class="gold-icon-btn" onclick="openGuideModal('rules')" title="Qo'llanma va Qoidalar">📖</button>
+                <button class="gold-icon-btn" onclick="openLeaderboardModal()" title="Top Reyting">🏆</button>
+                <button class="gold-icon-btn" onclick="openDailyBonusModal()" title="Kunlik Sovg'a">🎁</button>
+                <button class="gold-icon-btn" onclick="openChannelLink()" title="Rasmiy Kanal">📢</button>
+                <button class="gold-icon-btn" onclick="openProfile(false)" title="Mening Profilim">👤</button>
             </div>
 
             <div class="hero-action-row">
@@ -32,9 +32,9 @@
                 <button class="btn-square-gold" onclick="refreshRooms()">⟳</button>
             </div>
 
-            <div class="streak-card">
-                <span>🔥 7 kunlik seriya</span>
-                <strong style="color:var(--gold);">Bugun: Faol</strong>
+            <div class="streak-card" onclick="openDailyBonusModal()" style="cursor: pointer;" title="Kunlik bonusni olish">
+                <span id="streak-banner-title">🔥 7 kunlik seriya</span>
+                <strong id="streak-banner-btn" style="color:var(--gold); display:flex; align-items:center; gap:4px;">🎁 Sovg'ani olish ›</strong>
             </div>
 
             <div class="rooms-section-header">
@@ -377,9 +377,97 @@
                 </div>
             </div>
         </div>
+
+        <!-- 7. MAJBURIY KANAL OBUNASI MODALI -->
+        <div id="modal-channel-sub" class="modal-overlay" style="display: none; z-index: 10000; backdrop-filter: blur(8px);">
+            <div class="modal-content-panel channel-sub-panel">
+                <div class="channel-sub-icon">📢</div>
+                <h3 style="font-size:1.15rem; color:var(--gold); text-align:center; margin-bottom:6px; font-weight:800;">Kanalga a'zo bo'ling!</h3>
+                <p style="font-size:0.78rem; color:var(--text-muted); text-align:center; line-height:1.45; margin-bottom:14px;">
+                    O'yinni o'ynash uchun rasmiy kanalimizga a'zo bo'lishingiz shart. Kanalda yangiliklar va maxsus sovg'alar berib boriladi!
+                </p>
+
+                <div class="channel-card-box" onclick="openChannelLink()">
+                    <div class="channel-card-avatar">🎭</div>
+                    <div class="channel-card-info">
+                        <div class="channel-card-title">Mafia Cyber Rasmiy</div>
+                        <div class="channel-card-handle" id="sub-channel-handle">@durbeh</div>
+                    </div>
+                    <span class="channel-card-badge">Kanal ›</span>
+                </div>
+
+                <div id="sub-error-msg" style="display:none; color:var(--red); font-size:0.75rem; text-align:center; margin:8px 0; background:rgba(255,71,87,0.1); padding:8px 10px; border-radius:10px; border:1px solid rgba(255,71,87,0.3); font-weight:600;">
+                    ❌ Siz hali @durbeh kanaliga a'zo bo'lmadingiz! Iltimos, oldin obuna bo'ling.
+                </div>
+
+                <div id="sub-success-msg" style="display:none; color:var(--green); font-size:0.75rem; text-align:center; margin:8px 0; background:rgba(46,204,113,0.1); padding:8px 10px; border-radius:10px; border:1px solid rgba(46,204,113,0.3); font-weight:700;">
+                    ✅ Obuna tasdiqlandi!
+                </div>
+
+                <div style="display:flex; flex-direction:column; gap:8px; margin-top:10px;">
+                    <button class="btn-channel-join" onclick="openChannelLink()">
+                        ➕ Kanalga obuna bo'lish
+                    </button>
+                    <button class="btn-channel-check" id="btn-check-sub" onclick="verifySubscription(true)">
+                        ✅ A'zo bo'ldim (Tekshirish)
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 8. REYTING VA TOP O'YINCHILAR MODALI -->
+        <div id="modal-leaderboard" class="modal-overlay" style="display: none;" onclick="if(event.target===this) closeLeaderboardModal()">
+            <div class="modal-content-panel leaderboard-panel">
+                <div class="guide-modal-header">
+                    <div class="guide-modal-title">🏆 TOP O'YINCHILAR</div>
+                    <button class="guide-close-btn" onclick="closeLeaderboardModal()">✕</button>
+                </div>
+
+                <div class="guide-tabs" style="margin-bottom:8px;">
+                    <button class="guide-tab-btn active" id="lb-tab-top" onclick="switchLeaderboardTab('top')">🌟 Umumiy Top</button>
+                    <button class="guide-tab-btn" id="lb-tab-mafia" onclick="switchLeaderboardTab('mafia')">🔫 Best Mafia</button>
+                </div>
+
+                <div id="lb-list-box" class="leaderboard-list"></div>
+
+                <div class="my-rank-banner">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <span style="font-weight:800; color:var(--gold);">Sizning o'rningiz:</span>
+                        <span id="lb-my-name" style="font-weight:700;">O'yinchi</span>
+                    </div>
+                    <span id="lb-my-wins" style="font-weight:800; color:var(--green);">0 g'alaba</span>
+                </div>
+
+                <button class="btn-quick-join" style="width:100%; height:38px; margin-top:10px;" onclick="closeLeaderboardModal()">Yopish</button>
+            </div>
+        </div>
+
+        <!-- 9. KUNLIK SOVG'A VA SERIYA MODALI -->
+        <div id="modal-daily-bonus" class="modal-overlay" style="display: none;" onclick="if(event.target===this) closeDailyBonusModal()">
+            <div class="modal-content-panel bonus-panel">
+                <div class="guide-modal-header">
+                    <div class="guide-modal-title">🎁 KUNLIK BONUS</div>
+                    <button class="guide-close-btn" onclick="closeDailyBonusModal()">✕</button>
+                </div>
+
+                <p style="font-size:0.75rem; color:var(--text-muted); text-align:center; margin:4px 0 10px;">
+                    Har kuni o'yinga kiring va 7 kunlik seriyani to'plang!
+                </p>
+
+                <div class="bonus-days-grid" id="bonus-days-container"></div>
+
+                <div id="bonus-claimed-msg" style="display:none; color:var(--green); font-size:0.75rem; text-align:center; margin:8px 0; font-weight:700; background:rgba(46,204,113,0.1); padding:8px; border-radius:10px;">
+                    🎉 Bugungi bonus olindi! Ertaga qaytib kiring.
+                </div>
+
+                <button id="btn-claim-bonus" class="btn-quick-join" style="width:100%; height:40px; margin-top:8px;" onclick="claimDailyBonus()">
+                    🎁 Bugungi bonusni olish (+100 coin)
+                </button>
+            </div>
+        </div>
     </div>
     <script>
-        const jsSrc = (window.location.protocol === 'file:') ? 'bot.js?v=3.1' : '/static/bot.js?v=3.1';
+        const jsSrc = (window.location.protocol === 'file:') ? 'bot.js?v=3.2' : '/static/bot.js?v=3.2';
         document.write('<script src="' + jsSrc + '"><\/script>');
     </script>
 </body>

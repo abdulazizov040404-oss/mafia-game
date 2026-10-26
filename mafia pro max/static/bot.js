@@ -200,6 +200,25 @@ function closeCreateRoomModal() {
     document.getElementById("modal-create-room").style.display = "none";
 }
 
+function openGuideModal(tabName = 'rules') {
+    switchGuideTab(tabName);
+    document.getElementById("modal-guide").style.display = "flex";
+}
+
+function closeGuideModal() {
+    document.getElementById("modal-guide").style.display = "none";
+}
+
+function switchGuideTab(tabName) {
+    const tabs = ['rules', 'about', 'roles'];
+    tabs.forEach(t => {
+        const btn = document.getElementById(`tab-btn-${t}`);
+        const content = document.getElementById(`guide-tab-${t}`);
+        if (btn) btn.classList.toggle('active', t === tabName);
+        if (content) content.style.display = (t === tabName) ? 'block' : 'none';
+    });
+}
+
 function refreshRooms() {
     fetch("/api/rooms")
         .then(r => r.json())

@@ -1,9 +1,18 @@
 import os
+import sys
 import asyncio
 import random
 import html
 from typing import Dict, List, Optional
 from collections import Counter
+
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+        sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+    except Exception:
+        pass
+
 from pydantic import BaseModel
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query
 from fastapi.staticfiles import StaticFiles
@@ -50,6 +59,14 @@ async def root():
     if os.path.exists("static/index.html"):
         return FileResponse("static/index.html")
     return {"message": "index.html topilmadi."}
+
+@app.get("/style.css")
+async def get_style_css():
+    return FileResponse("static/style.css")
+
+@app.get("/bot.js")
+async def get_bot_js():
+    return FileResponse("static/bot.js")
 
 stats_db: Dict[str, dict] = {}
 
@@ -587,15 +604,15 @@ async def run_telegram_bot_loop():
             me_data = me_resp.json()
             if me_data.get("ok"):
                 bot_user = me_data["result"].get("username")
-                print(f"✅ Telegram bot muvaffaqiyatli ishga tushdi: @{bot_user}")
+                print(f"[OK] Telegram bot muvaffaqiyatli ishga tushdi: @{bot_user}")
             else:
-                print(f"❌ Telegram bot tokeni xato: {me_data.get('description')}")
+                print(f"[XATO] Telegram bot tokeni noto'g'ri: {me_data.get('description')}")
                 return
         except Exception as e:
-            print(f"❌ Telegram API bilan bog'lanishda xato: {e}")
+            print(f"[XATO] Telegram API bilan bog'lanishda xato: {e}")
             return
 
-        print("🚀 Telegram yangilanishlari (Updates) kutilmoqda...")
+        print("[START] Telegram xabarlari (Updates) qabul qilinmoqda...")
 
         while True:
             try:
@@ -631,7 +648,7 @@ async def run_telegram_bot_loop():
                             })
                             res_json = send_res.json()
                             if not res_json.get("ok"):
-                                print(f"❌ /start yuborishda xatolik: {res_json.get('description')}")
+                                print(f"[XATO] /start yuborishda xatolik: {res_json.get('description')}")
 
                     # 2. Callback Query
                     elif "callback_query" in update:
@@ -672,9 +689,15 @@ async def run_telegram_bot_loop():
                                 "show_alert": True
                             })
             except Exception as e:
-                print(f"❌ Telegram bot tsiklida xatolik: {e}")
+                print(f"[XATO] Telegram bot tsiklida xatolik: {e}")
                 await asyncio.sleep(2)
 
 @app.on_event("startup")
 async def startup_event():
     asyncio.create_task(run_telegram_bot_loop())
+
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.getenv("PORT", 8000))
+    print(f"🚀 Server ishga tushmoqda: http://localhost:{port}")
+    uvicorn.run("bot:app", host="0.0.0.0", port=port, reload=True)

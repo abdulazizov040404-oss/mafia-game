@@ -478,3 +478,288 @@ body {
   color: #000;
   font-weight: 700;
 }
+
+/* 6. QOIDALAR VA QO'LLANMA (KITOB) MODALI */
+.guide-modal-panel {
+  max-width: 410px;
+  width: 95%;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.75), 0 0 25px rgba(245, 176, 65, 0.15);
+}
+
+.guide-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.guide-modal-title {
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--gold);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  letter-spacing: 0.5px;
+}
+
+.guide-close-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.guide-close-btn:hover {
+  color: var(--text);
+  border-color: var(--gold);
+}
+
+.guide-tabs {
+  display: flex;
+  gap: 6px;
+  margin: 12px 0 10px;
+}
+
+.guide-tab-btn {
+  flex: 1;
+  padding: 8px 4px;
+  border-radius: 10px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 0.74rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: center;
+}
+
+.guide-tab-btn.active {
+  background: linear-gradient(135deg, #f5b041, #d48806);
+  color: #0c0f17;
+  border-color: #f5b041;
+  box-shadow: 0 4px 12px rgba(245, 176, 65, 0.35);
+  font-weight: 800;
+}
+
+.guide-tab-content {
+  flex: 1;
+  overflow-y: auto;
+  padding-right: 4px;
+  margin-bottom: 6px;
+}
+
+.guide-tab-content::-webkit-scrollbar {
+  width: 4px;
+}
+
+.guide-tab-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.guide-tab-content::-webkit-scrollbar-thumb {
+  background: rgba(245, 176, 65, 0.3);
+  border-radius: 4px;
+}
+
+/* Banner kartochka */
+.guide-banner-card {
+  background: rgba(245, 176, 65, 0.08);
+  border: 1px solid rgba(245, 176, 65, 0.25);
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+/* Qadamlar (Steps) */
+.guide-step-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  transition: border-color 0.2s ease;
+}
+
+.guide-step-card:hover {
+  border-color: rgba(245, 176, 65, 0.4);
+}
+
+.guide-step-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.guide-step-num {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--gold);
+  color: #0c0f17;
+  font-size: 0.7rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.guide-step-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.guide-step-desc {
+  font-size: 0.74rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+  margin-left: 30px;
+}
+
+/* O'yin haqida xususiyatlar gridi */
+.guide-features-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.guide-feature-box {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.guide-feature-icon {
+  font-size: 1.3rem;
+  margin-bottom: 2px;
+}
+
+.guide-feature-title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--gold);
+}
+
+.guide-feature-text {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  line-height: 1.35;
+}
+
+/* Rol kartochkalari */
+.guide-role-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 10px;
+  margin-bottom: 10px;
+  overflow: hidden;
+  transition: border-color 0.2s ease;
+}
+
+.guide-role-card:hover {
+  border-color: rgba(245, 176, 65, 0.4);
+}
+
+.guide-role-top {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.guide-role-img {
+  width: 52px;
+  height: 52px;
+  border-radius: 10px;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+}
+
+.guide-role-info {
+  flex: 1;
+}
+
+.guide-role-name {
+  font-size: 0.85rem;
+  font-weight: 800;
+  margin-bottom: 3px;
+}
+
+.guide-role-tag {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 6px;
+  font-size: 0.65rem;
+  font-weight: 700;
+}
+
+.tag-mafia {
+  background: rgba(255, 71, 87, 0.15);
+  color: var(--red);
+  border: 1px solid rgba(255, 71, 87, 0.3);
+}
+
+.tag-commissar {
+  background: rgba(91, 127, 255, 0.15);
+  color: var(--blue);
+  border: 1px solid rgba(91, 127, 255, 0.3);
+}
+
+.tag-doctor {
+  background: rgba(46, 204, 113, 0.15);
+  color: var(--green);
+  border: 1px solid rgba(46, 204, 113, 0.3);
+}
+
+.tag-citizen {
+  background: rgba(245, 176, 65, 0.15);
+  color: var(--gold);
+  border: 1px solid rgba(245, 176, 65, 0.3);
+}
+
+.guide-role-desc {
+  font-size: 0.74rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+  margin-bottom: 6px;
+}
+
+.guide-role-details {
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 8px;
+  padding: 6px 8px;
+  font-size: 0.7rem;
+  line-height: 1.4;
+  color: var(--text);
+  border-left: 2px solid var(--gold);
+}

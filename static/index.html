@@ -49,6 +49,7 @@
                 </div>
                 <div style="display:flex; gap:6px; align-items:center;">
                     <button class="gold-icon-btn" style="width:34px; height:34px; font-size:0.9rem;" onclick="openGuideModal('rules')" title="Qo'llanma va Qoidalar">📖</button>
+                    <button id="host-add-bot-btn" style="display:none; background:rgba(52, 152, 219, 0.15); border:1px solid var(--blue); color:var(--blue); border-radius:10px; padding:6px 10px; font-size:0.75rem; font-weight:700;" onclick="addBotPlayer()" title="Test uchun bot qo'shish">+🤖 Bot</button>
                     <button id="host-start-btn" style="display:none; background:var(--green); border:none; color:#fff; border-radius:10px; padding:6px 12px; font-size:0.75rem; font-weight:700;" onclick="startGame()">Boshlash</button>
                     <button id="host-restart-btn" style="display:none; background:var(--gold); border:none; color:#0c0f17; border-radius:10px; padding:6px 12px; font-size:0.75rem; font-weight:800;" onclick="restartGame()">🔄 Yangi o'yin</button>
                 </div>
@@ -71,6 +72,16 @@
             <div id="action-panel" style="display:none; background:var(--panel); padding:8px 12px; border-bottom:1px solid var(--border);">
                 <div id="action-title" style="font-size:0.75rem; color:var(--text-muted); margin-bottom:4px;">Tanlang:</div>
                 <div id="action-buttons-box" style="display:flex; flex-wrap:wrap; gap:6px;"></div>
+            </div>
+
+            <!-- MAFIA VA UMUMIY CHAT TABLARI (Faqat mafialarga ko'rinadi) -->
+            <div id="chat-tabs-bar" class="chat-tabs-bar" style="display:none;">
+                <button id="tab-chat-public" class="chat-tab-btn active" onclick="switchChatTab('public')">
+                    💬 Umumiy chat
+                </button>
+                <button id="tab-chat-mafia" class="chat-tab-btn mafia-tab" onclick="switchChatTab('mafia')">
+                    🕶️ Mafia chati <span id="mafia-chat-badge" style="display:none; background:var(--red); color:#fff; font-size:0.6rem; padding:1px 5px; border-radius:8px; margin-left:3px;">1</span>
+                </button>
             </div>
 
             <div id="chat-messages" class="telegram-chat-area"></div>

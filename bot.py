@@ -307,6 +307,7 @@ class Player:
         self.rais_revealed: bool = False
         self.bullets: int = 2
         self.disarmed: bool = False
+        self.is_bot: bool = False
 
 class GameRoom:
     def __init__(self, room_id: str, name: str, time_sec: int, host_name: str, host_avatar: str):
@@ -391,7 +392,8 @@ def get_public_players(room: GameRoom):
         "name": p.name,
         "avatar": p.avatar,
         "is_alive": p.is_alive,
-        "rais_revealed": getattr(p, "rais_revealed", False)
+        "rais_revealed": getattr(p, "rais_revealed", False),
+        "is_bot": getattr(p, "is_bot", False)
     } for p in room.players.values()]
 
 async def trigger_last_word(room: GameRoom, victim: Player):
@@ -478,6 +480,7 @@ async def game_loop(room: GameRoom):
         if p.role in ["mafia", "mafiaboshi", "xufya"]:
             stats_db[sid]["mafia_games"] = stats_db[sid].get("mafia_games", 0) + 1
     save_users_db()
+    room.phase = "discussion"
 
     while room.phase not in ["lobby", "game_over"]:
         # 1. KUNDUZGI MUHOKAMA
@@ -492,6 +495,23 @@ async def game_loop(room: GameRoom):
 
         while room.remaining_time > 0 and room.phase == "discussion":
             await broadcast(room, {"type": "timer", "time": room.remaining_time})
+            if room.remaining_time in [room.discussion_time - 10, 20]:
+                alive_bots = [p for p in room.players.values() if getattr(p, "is_bot", False) and p.is_alive]
+                if alive_bots:
+                    b = random.choice(alive_bots)
+                    b_chat = random.choice([
+                        "Men tinch aholiman, menga shubhalanmanglar!",
+                        "Kimdir judayam jim o'tiribdi, shubhali...",
+                        "O'ylaymanki, bugun yaxshilab tekshirishimiz kerak.",
+                        "Tergovchi kimnidir aniqladimi?"
+                    ])
+                    await broadcast(room, {
+                        "type": "chat",
+                        "sender": b.name,
+                        "sender_id": b.id,
+                        "avatar": b.avatar,
+                        "text": b_chat
+                    })
             await asyncio.sleep(1)
             room.remaining_time -= 1
 
@@ -506,8 +526,21 @@ async def game_loop(room: GameRoom):
         await broadcast(room, {"type": "phase_change", "phase": "voting", "time": 30, "candidates": cands})
         await broadcast(room, {"type": "chat", "text": "🗳 Ovoz berish boshlandi! O'yindan chiqarmoqchi bo'lgan odamingizni tanlang.", "is_system": True})
 
+        # Tirik botlar ovoz berishi
+        alive_players_ids = [p.id for p in room.players.values() if p.is_alive]
+        for b_pid, b_p in room.players.items():
+            if getattr(b_p, "is_bot", False) and b_p.is_alive:
+                cands_for_bot = [pid for pid in alive_players_ids if pid != b_pid]
+                if cands_for_bot:
+                    room.votes[b_pid] = random.choice(cands_for_bot)
+        if room.votes:
+            await broadcast(room, {"type": "vote_update", "votes": room.votes})
+
         while room.remaining_time > 0 and room.phase == "voting":
             await broadcast(room, {"type": "timer", "time": room.remaining_time})
+            if all(pid in room.votes for pid in alive_players_ids):
+                await asyncio.sleep(1)
+                break
             await asyncio.sleep(1)
             room.remaining_time -= 1
 
@@ -544,6 +577,15 @@ async def game_loop(room: GameRoom):
         room.remaining_time = 35
         targets = [{"id": p.id, "name": p.name} for p in room.players.values() if p.is_alive]
 
+        # Tirik botlar tunda o'z roliga qarab harakat qilishi:
+        for b_pid, b_p in room.players.items():
+            if getattr(b_p, "is_bot", False) and b_p.is_alive:
+                t_pool = [t["id"] for t in targets]
+                if b_p.role in ["mafia", "mafiaboshi", "commissar", "xufya"]:
+                    t_pool = [tid for tid in t_pool if tid != b_pid]
+                if t_pool:
+                    room.night_actions[b_pid] = random.choice(t_pool)
+
         # Har bir o'yinchiga shaxsiy ma'lumot uzatish
         for p in room.players.values():
             if p.ws and p.is_alive:
@@ -571,6 +613,13 @@ async def game_loop(room: GameRoom):
 
         while room.remaining_time > 0 and room.phase == "night":
             await broadcast(room, {"type": "timer", "time": room.remaining_time})
+            active_night_humans = [
+                p.id for p in room.players.values()
+                if p.is_alive and not getattr(p, "is_bot", False) and p.role in ["mafia", "mafiaboshi", "doctor", "commissar", "mirshab", "xufya"]
+            ]
+            if all(pid in room.night_actions for pid in active_night_humans):
+                await asyncio.sleep(2)
+                break
             await asyncio.sleep(1)
             room.remaining_time -= 1
 
@@ -792,8 +841,22 @@ async def ws_handler(websocket: WebSocket, room_id: str, user_id: str, name: str
                     save_users_db()
                 await broadcast(room, {"type": "players_update", "players": get_public_players(room)})
 
+            elif act == "add_bot" and room.phase == "lobby" and room.host_id == user_id:
+                if len(room.players) < 16:
+                    bot_id = f"bot_{random.randint(1000, 9999)}"
+                    bot_names = ["Ali", "Vali", "Sardor", "Nodir", "Jasur", "Timur", "Aziz", "Davron", "Malika", "Ziyoda", "Lola", "Shahnoza"]
+                    existing_names = [p.name for p in room.players.values()]
+                    available_names = [n for n in bot_names if n not in existing_names]
+                    b_name = random.choice(available_names) if available_names else f"Bot{len(room.players)+1}"
+                    b_avatar = f"https://api.dicebear.com/7.x/bottts/svg?seed={bot_id}"
+                    bot_p = Player(bot_id, b_name, b_avatar, None)
+                    bot_p.is_bot = True
+                    room.players[bot_id] = bot_p
+                    await broadcast(room, {"type": "players_update", "players": get_public_players(room)})
+                    await broadcast(room, {"type": "chat", "text": f"🤖 {b_name} (Bot) xonaga qo'shildi.", "is_system": True})
+
             elif act == "start_game" and room.phase == "lobby" and room.host_id == user_id:
-                active_players = [pid for pid, p in room.players.items() if p.ws is not None]
+                active_players = [pid for pid, p in room.players.items() if p.ws is not None or getattr(p, "is_bot", False)]
                 if len(active_players) < 4:
                     continue
 
@@ -855,6 +918,7 @@ async def ws_handler(websocket: WebSocket, room_id: str, user_id: str, name: str
                             payload["bullets"] = 2
                         await p.ws.send_json(payload)
 
+                room.phase = "discussion"
                 room.task = asyncio.create_task(game_loop(room))
 
             elif act == "reveal_rais" and player and player.is_alive and player.role == "rais":
@@ -910,6 +974,27 @@ async def ws_handler(websocket: WebSocket, room_id: str, user_id: str, name: str
                             "avatar": player.avatar,
                             "text": msg
                         })
+
+            elif act == "mafia_chat" and player and player.is_alive:
+                if player.role in ["mafia", "mafiaboshi", "xufya"]:
+                    msg = data.get("text", "").strip()
+                    if msg:
+                        # Faqat tirik mafia jamoasiga yuboriladi (Tinch aholi aslo ko'rmaydi!)
+                        for m_id, m_p in room.players.items():
+                            if m_p.ws and m_p.role in ["mafia", "mafiaboshi", "xufya"]:
+                                try:
+                                    await m_p.ws.send_json({
+                                        "type": "chat",
+                                        "sender": player.name,
+                                        "sender_id": player.id,
+                                        "avatar": player.avatar,
+                                        "text": msg,
+                                        "is_mafia": True,
+                                        "role": player.role,
+                                        "is_self": (player.id == m_id)
+                                    })
+                                except Exception:
+                                    pass
 
             elif act == "vote" and player and player.is_alive:
                 if room.phase in ["voting", "revoting"]:

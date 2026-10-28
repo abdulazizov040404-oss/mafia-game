@@ -511,6 +511,72 @@ function confirmCreateRoom() {
     });
 }
 
+let currentRemainingSeconds = 60;
+let countdownTimerInterval = null;
+let currentChatTab = "public";
+let unreadMafiaCount = 0;
+
+function updateTimerDisplay(sec) {
+    sec = Math.max(0, sec);
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    const el = document.getElementById("game-timer");
+    if (el) {
+        el.innerText = `${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
+        if (sec <= 10 && sec > 0) {
+            el.classList.add("timer-pulse-critical");
+        } else {
+            el.classList.remove("timer-pulse-critical");
+        }
+    }
+}
+
+function startLocalCountdown(seconds) {
+    currentRemainingSeconds = seconds;
+    updateTimerDisplay(currentRemainingSeconds);
+    if (countdownTimerInterval) {
+        clearInterval(countdownTimerInterval);
+    }
+    countdownTimerInterval = setInterval(() => {
+        if (currentRemainingSeconds > 0) {
+            currentRemainingSeconds--;
+            updateTimerDisplay(currentRemainingSeconds);
+        } else {
+            clearInterval(countdownTimerInterval);
+            countdownTimerInterval = null;
+        }
+    }, 1000);
+}
+
+function switchChatTab(tab) {
+    currentChatTab = tab;
+    const pubBtn = document.getElementById("tab-chat-public");
+    const mafBtn = document.getElementById("tab-chat-mafia");
+    const inp = document.getElementById("chat-input");
+    const wrapper = document.getElementById("screen-game");
+
+    if (tab === "mafia") {
+        if (pubBtn) pubBtn.classList.remove("active");
+        if (mafBtn) mafBtn.classList.add("active");
+        if (inp) inp.placeholder = "🕶️ Mafia sheriklarga maxfiy xabar...";
+        if (wrapper) wrapper.classList.add("mafia-chat-mode-active");
+        unreadMafiaCount = 0;
+        const badge = document.getElementById("mafia-chat-badge");
+        if (badge) badge.style.display = "none";
+    } else {
+        if (pubBtn) pubBtn.classList.add("active");
+        if (mafBtn) mafBtn.classList.remove("active");
+        if (inp) inp.placeholder = "Xabaringizni yozing...";
+        if (wrapper) wrapper.classList.remove("mafia-chat-mode-active");
+    }
+}
+
+function addBotPlayer() {
+    if (ws && isHost) {
+        ws.send(JSON.stringify({ action: "add_bot" }));
+    }
+}
+
 function joinRoom(roomId) {
     if (!isSubscribed && requireSub) {
         document.getElementById("modal-channel-sub").style.display = "flex";
@@ -554,11 +620,16 @@ function joinRoom(roomId) {
         }
         else if (d.type === "your_role") {
             myRole = d.role;
+            const isMafiaMember = ["mafia", "mafiaboshi", "xufya"].includes(myRole);
+            const chatTabsBar = document.getElementById("chat-tabs-bar");
+            if (chatTabsBar) {
+                chatTabsBar.style.display = isMafiaMember ? "flex" : "none";
+            }
             const r = roleAssets[myRole] || roleAssets.citizen;
             document.getElementById("role-img-card").src = r.img;
             document.getElementById("role-title-card").innerText = r.title;
             let desc = r.desc;
-            if (["mafia", "mafiaboshi", "xufya"].includes(myRole) && d.partners && d.partners.length > 0) {
+            if (isMafiaMember && d.partners && d.partners.length > 0) {
                 desc += "\n\n👥 Sizning mafia sheriklaringiz: " + d.partners.join(", ");
             }
             if (myRole === "mirshab") {
@@ -575,9 +646,8 @@ function joinRoom(roomId) {
             handlePhaseChange(d);
         }
         else if (d.type === "timer") {
-            const m = Math.floor(d.time / 60);
-            const s = d.time % 60;
-            document.getElementById("game-timer").innerText = `${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
+            currentRemainingSeconds = d.time;
+            updateTimerDisplay(currentRemainingSeconds);
         }
         else if (d.type === "players_update") {
             currentPlayersData = d.players;
@@ -603,7 +673,7 @@ function joinRoom(roomId) {
             renderHorizontalPlayers();
         }
         else if (d.type === "chat") {
-            appendChatBubble(d.sender, d.avatar, d.text, d.is_self, d.is_system, d.is_last_word);
+            appendChatBubble(d.sender, d.avatar, d.text, d.is_self, d.is_system, d.is_last_word, d.is_mafia, d.role);
         }
     };
 
@@ -616,8 +686,10 @@ function updateHostStartButtonVisibility() {
     const startBtn = document.getElementById("host-start-btn");
     const restartBtn = document.getElementById("host-restart-btn");
     const waitHint = document.getElementById("players-wait-hint");
+    const addBotBtn = document.getElementById("host-add-bot-btn");
 
     if (isHost) {
+        if (addBotBtn) addBotBtn.style.display = "block";
         if (currentPlayersData.length >= 4) {
             startBtn.style.display = "block";
             waitHint.style.display = "none";
@@ -630,6 +702,7 @@ function updateHostStartButtonVisibility() {
         startBtn.style.display = "none";
         restartBtn.style.display = "none";
         waitHint.style.display = "none";
+        if (addBotBtn) addBotBtn.style.display = "none";
     }
 }
 
@@ -648,6 +721,10 @@ function handlePhaseChange(d) {
 
     isLastWordPhase = (d.phase === "last_word");
     lastWordSpeakerId = d.speaker_id || null;
+
+    if (d.time !== undefined) {
+        startLocalCountdown(d.time);
+    }
 
     // Orqa fonni kun/tun fazasiga qarab siljitish
     if (d.phase === "night") {
@@ -846,6 +923,16 @@ function sendChat() {
     const val = inp.value.trim();
     if (!val) return;
 
+    if (currentChatTab === "mafia") {
+        if (!isAlive) {
+            alert("Siz o'yindan chiqqansiz, faqat kuzatuvchi sifatida qatnasha olasiz.");
+            return;
+        }
+        ws.send(JSON.stringify({ action: "mafia_chat", text: val }));
+        inp.value = "";
+        return;
+    }
+
     if (isLastWordPhase && lastWordSpeakerId !== userId) {
         alert("Hozir faqat o'yindan chiqayotgan odamning oxirgi so'zi eshitiladi!");
         return;
@@ -860,7 +947,7 @@ function sendChat() {
     inp.value = "";
 }
 
-function appendChatBubble(sender, avatar, text, isSelf, isSystem, isLastWord) {
+function appendChatBubble(sender, avatar, text, isSelf, isSystem, isLastWord, isMafia, role) {
     const box = document.getElementById("chat-messages");
     if (isSystem) {
         const s = document.createElement("div");
@@ -869,15 +956,27 @@ function appendChatBubble(sender, avatar, text, isSelf, isSystem, isLastWord) {
         box.appendChild(s);
     } else {
         const row = document.createElement("div");
-        row.className = `tg-msg-row ${isSelf ? 'self' : ''} ${isLastWord ? 'last-word-msg' : ''}`;
+        row.className = `tg-msg-row ${isSelf ? 'self' : ''} ${isLastWord ? 'last-word-msg' : ''} ${isMafia ? 'mafia-msg' : ''}`;
+        
+        const mafiaBadgeHtml = isMafia ? '<span class="mafia-badge-pill">🕶️ MAFIA</span> ' : '';
+
         row.innerHTML = `
             <img src="${avatar || presetAvatars[0]}" class="tg-msg-avatar">
             <div class="tg-msg-bubble">
-                <div class="tg-sender-name">${sender} ${isLastWord ? '(Oxirgi so\'z)' : ''}</div>
+                <div class="tg-sender-name">${mafiaBadgeHtml}${sender} ${isLastWord ? '(Oxirgi so\'z)' : ''}</div>
                 <div class="tg-msg-text">${text}</div>
             </div>
         `;
         box.appendChild(row);
+
+        if (isMafia && currentChatTab !== "mafia") {
+            unreadMafiaCount++;
+            const badge = document.getElementById("mafia-chat-badge");
+            if (badge) {
+                badge.style.display = "inline";
+                badge.innerText = unreadMafiaCount;
+            }
+        }
     }
     box.scrollTop = box.scrollHeight;
 }
@@ -893,6 +992,8 @@ function startGame() {
     }
     ws.send(JSON.stringify({ action: "start_game" }));
     document.getElementById("host-start-btn").style.display = "none";
+    const addBotBtn = document.getElementById("host-add-bot-btn");
+    if (addBotBtn) addBotBtn.style.display = "none";
 }
 
 function leaveRoom() {
@@ -906,6 +1007,13 @@ function leaveRoom() {
 }
 
 function leaveRoomLocally() {
+    if (countdownTimerInterval) {
+        clearInterval(countdownTimerInterval);
+        countdownTimerInterval = null;
+    }
+    const chatTabsBar = document.getElementById("chat-tabs-bar");
+    if (chatTabsBar) chatTabsBar.style.display = "none";
+    switchChatTab("public");
     currentRoomId = null;
     isHost = false;
     document.getElementById("screen-game").style.display = "none";

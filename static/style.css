@@ -1119,3 +1119,90 @@ body.light-theme .app-wrapper {
   font-weight: 800;
   color: var(--gold);
 }
+
+/* ===== MAFIA MAXFIY CHATI VA ANIMATSIYALAR ===== */
+.chat-tabs-bar {
+  display: flex;
+  background: rgba(14, 18, 28, 0.95);
+  border-bottom: 1px solid var(--border);
+  padding: 5px 10px;
+  gap: 8px;
+  align-items: center;
+}
+
+.chat-tab-btn {
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  border-radius: 8px;
+  padding: 5px 12px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.2s ease;
+}
+
+.chat-tab-btn.active {
+  background: var(--gold);
+  color: #0c0f17;
+  border-color: var(--gold);
+}
+
+.chat-tab-btn.mafia-tab {
+  border-color: rgba(231, 76, 60, 0.4);
+}
+
+.chat-tab-btn.mafia-tab.active {
+  background: linear-gradient(135deg, #c0392b, #8e44ad);
+  color: #fff;
+  border-color: #ff4757;
+  box-shadow: 0 0 10px rgba(255, 71, 87, 0.45);
+}
+
+.tg-msg-row.mafia-msg .tg-msg-bubble {
+  background: rgba(231, 76, 60, 0.16) !important;
+  border: 1px solid rgba(255, 71, 87, 0.45) !important;
+  box-shadow: 0 0 10px rgba(231, 76, 60, 0.2);
+}
+
+.tg-msg-row.mafia-msg .tg-sender-name {
+  color: #ff6b81 !important;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 800;
+}
+
+.mafia-badge-pill {
+  background: #ff4757;
+  color: #fff;
+  font-size: 0.58rem;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.mafia-chat-mode-active #chat-input {
+  border-color: rgba(255, 71, 87, 0.7) !important;
+  box-shadow: 0 0 10px rgba(255, 71, 87, 0.25) !important;
+}
+
+.mafia-chat-mode-active .chat-send-round-btn {
+  background: linear-gradient(135deg, #ff4757, #c0392b) !important;
+}
+
+/* Orqaga sanash taymeri qizil pulsatsiyasi */
+.timer-pulse-critical {
+  color: #ff4757 !important;
+  animation: timerPulse 0.8s infinite alternate !important;
+}
+
+@keyframes timerPulse {
+  0% { transform: scale(1); filter: drop-shadow(0 0 2px rgba(255, 71, 87, 0.4)); }
+  100% { transform: scale(1.12); filter: drop-shadow(0 0 10px rgba(255, 71, 87, 0.95)); }
+}

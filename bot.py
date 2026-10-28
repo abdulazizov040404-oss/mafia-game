@@ -307,9 +307,11 @@ class Player:
         self.rais_revealed: bool = False
         self.bullets: int = 2
         self.disarmed: bool = False
+        self.is_muted: bool = False
+        self.is_speaking: bool = False
 
 class GameRoom:
-    def __init__(self, room_id: str, name: str, time_sec: int, host_name: str, host_avatar: str):
+    def __init__(self, room_id: str, name: str, time_sec: int, host_name: str, host_avatar: str, mode: str = "voice", voice_type: str = "turn"):
         self.id = room_id
         self.name = name
         self.host_id: Optional[str] = None
@@ -317,12 +319,17 @@ class GameRoom:
         self.host_avatar = host_avatar
         self.players: Dict[str, Player] = {}
         self.phase: str = "lobby"
+        self.mode: str = mode  # "voice" yoki "chat"
+        self.voice_type: str = voice_type  # "turn" (navbatma-navbat) yoki "free" (erkin)
         self.discussion_time: int = time_sec
         self.remaining_time: int = time_sec
         self.votes: Dict[str, str] = {}
         self.night_actions: Dict[str, str] = {}
         self.chat_history: List[dict] = []
         self.last_word_speaker_id: Optional[str] = None
+        self.current_speaker_id: Optional[str] = None
+        self.can_speak_ids: List[str] = []
+        self.skip_turn_event: asyncio.Event = asyncio.Event()
         self.last_healed_id: Optional[str] = None
         self.winner: Optional[str] = None
         self.task: Optional[asyncio.Task] = None
@@ -336,33 +343,47 @@ class CreateRoomRequest(BaseModel):
     time_sec: int = 60
     host_name: str = "Host"
     host_avatar: str = ""
+    mode: str = "voice"       # "voice" yoki "chat"
+    voice_type: str = "turn"  # "turn" yoki "free"
 
 @app.post("/api/create_room")
 async def create_room_api(payload: CreateRoomRequest):
     room_id = str(random.randint(1000, 9999))
     while room_id in rooms:
         room_id = str(random.randint(1000, 9999))
-    rooms[room_id] = GameRoom(room_id, payload.name, payload.time_sec, payload.host_name, payload.host_avatar)
+    m = payload.mode if payload.mode in ["voice", "chat"] else "voice"
+    vt = payload.voice_type if payload.voice_type in ["turn", "free"] else "turn"
+    rooms[room_id] = GameRoom(room_id, payload.name, payload.time_sec, payload.host_name, payload.host_avatar, mode=m, voice_type=vt)
     return JSONResponse({"room_id": room_id})
 
 @app.get("/api/rooms")
-async def list_rooms():
+async def list_rooms(mode: Optional[str] = None):
     active = []
     for r_id, r in rooms.items():
         if len(r.players) > 0 and r.phase == "lobby":
+            rmode = getattr(r, "mode", "voice")
+            if mode and rmode != mode:
+                continue
             active.append({
                 "id": r_id,
                 "name": r.name,
                 "count": len([p for p in r.players.values() if p.ws is not None]),
                 "time_min": max(1, r.discussion_time // 60),
                 "host_name": r.host_name,
-                "host_avatar": r.host_avatar
+                "host_avatar": r.host_avatar,
+                "mode": rmode,
+                "voice_type": getattr(r, "voice_type", "turn")
             })
     return JSONResponse({"rooms": active})
 
 @app.get("/api/quick_join")
-async def quick_join_api():
-    candidates = [r for r in rooms.values() if r.phase == "lobby" and len(r.players) > 0]
+async def quick_join_api(mode: Optional[str] = None):
+    candidates = [
+        r for r in rooms.values() 
+        if r.phase == "lobby" and len(r.players) > 0 and (not mode or getattr(r, "mode", "voice") == mode)
+    ]
+    if not candidates:
+        candidates = [r for r in rooms.values() if r.phase == "lobby" and len(r.players) > 0]
     if candidates:
         chosen = random.choice(candidates)
         return JSONResponse({"room_id": chosen.id})
@@ -391,22 +412,27 @@ def get_public_players(room: GameRoom):
         "name": p.name,
         "avatar": p.avatar,
         "is_alive": p.is_alive,
-        "rais_revealed": getattr(p, "rais_revealed", False)
+        "rais_revealed": getattr(p, "rais_revealed", False),
+        "is_muted": getattr(p, "is_muted", False),
+        "is_speaking": getattr(p, "is_speaking", False)
     } for p in room.players.values()]
 
 async def trigger_last_word(room: GameRoom, victim: Player):
     room.phase = "last_word"
     room.last_word_speaker_id = victim.id
-    room.remaining_time = 15
+    room.current_speaker_id = victim.id
+    room.can_speak_ids = [victim.id]
+    room.remaining_time = 20
     await broadcast(room, {
         "type": "phase_change",
         "phase": "last_word",
-        "time": 15,
-        "speaker_id": victim.id
+        "time": 20,
+        "speaker_id": victim.id,
+        "speaker_name": victim.name
     })
     await broadcast(room, {
         "type": "chat",
-        "text": f"🎤 {victim.name} uchun oxirgi so'z! (15 soniya)",
+        "text": f"🎤 {victim.name} uchun ovozli oxirgi so'z! (20 soniya)",
         "is_system": True
     })
 
@@ -417,6 +443,8 @@ async def trigger_last_word(room: GameRoom, victim: Player):
 
     victim.is_alive = False
     room.last_word_speaker_id = None
+    room.current_speaker_id = None
+    room.can_speak_ids = []
     await broadcast(room, {"type": "players_update", "players": get_public_players(room)})
 
 def evaluate_game_status(room: GameRoom) -> bool:
@@ -481,14 +509,77 @@ async def game_loop(room: GameRoom):
     while room.phase not in ["lobby", "game_over"]:
         # 1. KUNDUZGI MUHOKAMA
         room.phase = "discussion"
-        room.remaining_time = room.discussion_time
-        await broadcast(room, {"type": "phase_change", "phase": "discussion", "time": room.remaining_time})
-        await broadcast(room, {"type": "chat", "text": "☀️ Kunduzgi muhokama boshlandi! Shahardagi gumonlanuvchilarni aniqlang.", "is_system": True})
+        if getattr(room, "mode", "voice") == "voice" and getattr(room, "voice_type", "turn") == "turn":
+            # Navbatma-navbat (Turn-based speech)
+            alive_players = [p for p in room.players.values() if p.is_alive]
+            turn_duration = 30
+            for spk in alive_players:
+                if not spk.is_alive or room.phase != "discussion":
+                    continue
+                room.current_speaker_id = spk.id
+                room.can_speak_ids = [spk.id]
+                room.skip_turn_event.clear()
+                await broadcast(room, {
+                    "type": "phase_change",
+                    "phase": "discussion",
+                    "time": turn_duration,
+                    "speaker_id": spk.id,
+                    "speaker_name": spk.name,
+                    "is_free_talk": False
+                })
+                await broadcast(room, {
+                    "type": "chat",
+                    "text": f"🎙️ Nutq navbati: {spk.name} (30 soniya)!",
+                    "is_system": True
+                })
+                for sec in range(turn_duration, 0, -1):
+                    if room.skip_turn_event.is_set() or room.phase != "discussion":
+                        break
+                    await broadcast(room, {"type": "timer", "time": sec})
+                    await asyncio.sleep(1)
 
-        while room.remaining_time > 0 and room.phase == "discussion":
-            await broadcast(room, {"type": "timer", "time": room.remaining_time})
-            await asyncio.sleep(1)
-            room.remaining_time -= 1
+            # Navbatlar yakunlangach, 45s umumiy erkin bahs
+            room.current_speaker_id = "all"
+            room.can_speak_ids = [p.id for p in room.players.values() if p.is_alive]
+            free_time = 45
+            await broadcast(room, {
+                "type": "phase_change",
+                "phase": "discussion",
+                "time": free_time,
+                "speaker_id": "all",
+                "speaker_name": "Umumiy erkin bahs",
+                "is_free_talk": True
+            })
+            await broadcast(room, {
+                "type": "chat",
+                "text": "📢 Umumiy erkin munozara (45 soniya)! Barcha o'yinchilar erkin bahslashishi mumkin.",
+                "is_system": True
+            })
+            for sec in range(free_time, 0, -1):
+                if room.phase != "discussion":
+                    break
+                await broadcast(room, {"type": "timer", "time": sec})
+                await asyncio.sleep(1)
+        else:
+            # Erkin bahs (Voice Free) yoki Chatli Mafia
+            is_voice = (getattr(room, "mode", "voice") == "voice")
+            room.current_speaker_id = "all" if is_voice else None
+            room.can_speak_ids = [p.id for p in room.players.values() if p.is_alive]
+            room.remaining_time = room.discussion_time
+            await broadcast(room, {
+                "type": "phase_change",
+                "phase": "discussion",
+                "time": room.remaining_time,
+                "speaker_id": "all" if is_voice else None,
+                "is_free_talk": True
+            })
+            msg_text = "🎙️ Ovozli erkin munozara boshlandi! Hamma jonli suhbatlashishi mumkin." if is_voice else "☀️ Kunduzgi muhokama boshlandi! Shahardagi gumonlanuvchilarni aniqlang."
+            await broadcast(room, {"type": "chat", "text": msg_text, "is_system": True})
+
+            while room.remaining_time > 0 and room.phase == "discussion":
+                await broadcast(room, {"type": "timer", "time": room.remaining_time})
+                await asyncio.sleep(1)
+                room.remaining_time -= 1
 
         if evaluate_game_status(room):
             break
@@ -497,8 +588,11 @@ async def game_loop(room: GameRoom):
         room.phase = "voting"
         room.votes.clear()
         room.remaining_time = 30
+        is_voice = (getattr(room, "mode", "voice") == "voice")
+        room.current_speaker_id = "all" if is_voice else None
+        room.can_speak_ids = [p.id for p in room.players.values() if p.is_alive]
         cands = [{"id": p.id, "name": p.name} for p in room.players.values() if p.is_alive]
-        await broadcast(room, {"type": "phase_change", "phase": "voting", "time": 30, "candidates": cands})
+        await broadcast(room, {"type": "phase_change", "phase": "voting", "time": 30, "candidates": cands, "speaker_id": "all" if is_voice else None})
         await broadcast(room, {"type": "chat", "text": "🗳 Ovoz berish boshlandi! O'yindan chiqarmoqchi bo'lgan odamingizni tanlang.", "is_system": True})
 
         while room.remaining_time > 0 and room.phase == "voting":
@@ -535,6 +629,8 @@ async def game_loop(room: GameRoom):
         # 3. TUN BOSQICHI
         room.day_number += 1
         room.phase = "night"
+        room.current_speaker_id = None
+        room.can_speak_ids = []
         room.night_actions.clear()
         room.remaining_time = 35
         targets = [{"id": p.id, "name": p.name} for p in room.players.values() if p.is_alive]
@@ -737,7 +833,13 @@ async def ws_handler(websocket: WebSocket, room_id: str, user_id: str, name: str
             stats_db[uid]["avatar"] = avatar
     save_users_db()
 
-    await websocket.send_json({"type": "room_info", "name": room.name})
+    await websocket.send_json({
+        "type": "room_info",
+        "name": room.name,
+        "mode": getattr(room, "mode", "voice"),
+        "voice_type": getattr(room, "voice_type", "turn"),
+        "current_speaker_id": getattr(room, "current_speaker_id", None)
+    })
     if room.host_id == user_id:
         await websocket.send_json({"type": "is_admin"})
 
@@ -745,6 +847,7 @@ async def ws_handler(websocket: WebSocket, room_id: str, user_id: str, name: str
         await websocket.send_json(old_msg)
 
     await broadcast(room, {"type": "players_update", "players": get_public_players(room)})
+    await broadcast(room, {"type": "peer_joined", "user_id": user_id, "name": clean_name})
 
     try:
         while True:
@@ -753,6 +856,7 @@ async def ws_handler(websocket: WebSocket, room_id: str, user_id: str, name: str
             player = room.players.get(user_id)
 
             if act == "leave":
+                await broadcast(room, {"type": "peer_left", "user_id": user_id})
                 if room.host_id == user_id and room.phase == "lobby":
                     await broadcast(room, {"type": "room_closed"})
                     if room.id in rooms:
@@ -915,7 +1019,37 @@ async def ws_handler(websocket: WebSocket, room_id: str, user_id: str, name: str
                 if target_id in room.players and room.players[target_id].is_alive:
                     room.night_actions[user_id] = target_id
 
+            elif act == "webrtc_signal":
+                target_id = str(data.get("target_id", ""))
+                sig = data.get("signal")
+                if target_id in room.players and room.players[target_id].ws:
+                    try:
+                        await room.players[target_id].ws.send_json({
+                            "type": "webrtc_signal",
+                            "sender_id": user_id,
+                            "signal": sig
+                        })
+                    except Exception:
+                        pass
+
+            elif act == "mic_status" and player:
+                is_muted = bool(data.get("is_muted", False))
+                is_speaking = bool(data.get("is_speaking", False))
+                player.is_muted = is_muted
+                player.is_speaking = is_speaking
+                await broadcast(room, {
+                    "type": "player_mic_status",
+                    "user_id": user_id,
+                    "is_muted": is_muted,
+                    "is_speaking": is_speaking
+                })
+
+            elif act == "skip_turn" and (user_id == getattr(room, "current_speaker_id", None) or user_id == room.host_id):
+                if hasattr(room, "skip_turn_event"):
+                    room.skip_turn_event.set()
+
     except WebSocketDisconnect:
+        await broadcast(room, {"type": "peer_left", "user_id": user_id})
         if room.host_id == user_id:
             if room.phase == "lobby":
                 await broadcast(room, {"type": "room_closed"})
@@ -949,11 +1083,13 @@ async def ws_handler(websocket: WebSocket, room_id: str, user_id: str, name: str
 def generate_welcome_text(user_name: str) -> str:
     safe_name = html.escape(user_name or "O'yinchi")
     return (
-        f"🎭 <b>Mafia Cyber</b> olamiga xush kelibsiz, <b>{safe_name}</b>!\n\n"
+        f"🎭 <b>Mafia Club</b> olamiga xush kelibsiz, <b>{safe_name}</b>!\n\n"
+        "🎙️ <b>YANGILIK: Ovozli Mafia (Voice Mafia) rejimi ishga tushdi!</b>\n"
+        "Endi real vaqtda mikrofon orqali xuddi haqiqiy klublardek jonli ovoz bilan o'ynashingiz mumkin!\n\n"
         "🌙 Kechasi mafialar nishonni kelishadi, ☀️ kunduzi shahar ahli jinoyatchini qidiradi.\n"
-        "👥 4–16 o'yinchi · 🕵️ Maxfiy rollar · 🗳 Ovoz berish · 🎤 Oxirgi so'z\n\n"
+        "👥 4–16 o'yinchi · 🎙 Ovozli va 💬 Chatli xonalar · ⏱ Navbatma-navbat nutq · 🎤 Oxirgi so'z\n\n"
         "⚡️ Xona yarating yoki «Tezkor qo'shilish» orqali jangga kiring!\n"
-        "🏆 O'ynang, g'alaba qozoning va tajribangizni oshiring.\n\n"
+        "🏆 O'ynang, g'alaba qozoning va reytingda yetakchi bo'ling.\n\n"
         "▶️ O'yinga kirish uchun quyidagi tugmani bosing!"
     )
 

@@ -61,419 +61,6 @@ let selectedTimerMinutes = 60;
 let currentVotesData = {};
 let currentPlayersData = [];
 
-// ==========================================================
-// OVOZLI MAFIA (VOICE MAFIA) VA SFX TIZIMI
-// ==========================================================
-let selectedRoomMode = "voice";     // "voice" | "chat"
-let selectedVoiceType = "turn";     // "turn" | "free"
-let currentRoomsFilter = "all";     // "all" | "voice" | "chat"
-let currentRoomMode = "voice";
-let currentVoiceType = "turn";
-let currentSpeakerId = null;
-let isFreeTalk = true;
-let isMicMuted = false;
-let canSpeak = true;
-let currentPhaseName = "lobby";
-let sfxEnabled = (localStorage.getItem("mafia_sfx") !== "false");
-let localAudioStream = null;
-let peerConnections = {};
-let audioContext = null;
-let analyserNode = null;
-let micVolumeInterval = null;
-let lastSpeakingState = false;
-
-const rtcConfig = {
-    iceServers: [
-        { urls: "stun:stun.l.google.com:19302" },
-        { urls: "stun:stun1.l.google.com:19302" },
-        { urls: "stun:stun2.l.google.com:19302" }
-    ]
-};
-
-// Web Audio API yordamida professional tovush effektlari (SFX)
-function playSfx(type) {
-    if (!sfxEnabled) return;
-    try {
-        const AudioCtx = window.AudioContext || window.webkitAudioContext;
-        if (!AudioCtx) return;
-        const ctx = new AudioCtx();
-        const now = ctx.currentTime;
-
-        if (type === 'gong') {
-            const osc = ctx.createOscillator();
-            const gain = ctx.createGain();
-            osc.type = 'sine';
-            osc.frequency.setValueAtTime(480, now);
-            osc.frequency.exponentialRampToValueAtTime(200, now + 1.2);
-            gain.gain.setValueAtTime(0.3, now);
-            gain.gain.exponentialRampToValueAtTime(0.001, now + 1.2);
-            osc.connect(gain);
-            gain.connect(ctx.destination);
-            osc.start(now);
-            osc.stop(now + 1.2);
-        } else if (type === 'ding') {
-            const osc = ctx.createOscillator();
-            const gain = ctx.createGain();
-            osc.type = 'triangle';
-            osc.frequency.setValueAtTime(880, now);
-            osc.frequency.setValueAtTime(1320, now + 0.1);
-            gain.gain.setValueAtTime(0.25, now);
-            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
-            osc.connect(gain);
-            gain.connect(ctx.destination);
-            osc.start(now);
-            osc.stop(now + 0.6);
-        } else if (type === 'night') {
-            const osc = ctx.createOscillator();
-            const gain = ctx.createGain();
-            osc.type = 'sine';
-            osc.frequency.setValueAtTime(140, now);
-            osc.frequency.linearRampToValueAtTime(90, now + 1.5);
-            gain.gain.setValueAtTime(0.2, now);
-            gain.gain.exponentialRampToValueAtTime(0.001, now + 1.5);
-            osc.connect(gain);
-            gain.connect(ctx.destination);
-            osc.start(now);
-            osc.stop(now + 1.5);
-        } else if (type === 'shot') {
-            const bufferSize = ctx.sampleRate * 0.35;
-            const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-            const data = buffer.getChannelData(0);
-            for (let i = 0; i < bufferSize; i++) {
-                data[i] = Math.random() * 2 - 1;
-            }
-            const noise = ctx.createBufferSource();
-            noise.buffer = buffer;
-            const filter = ctx.createBiquadFilter();
-            filter.type = 'lowpass';
-            filter.frequency.setValueAtTime(800, now);
-            filter.frequency.exponentialRampToValueAtTime(40, now + 0.3);
-            const gain = ctx.createGain();
-            gain.gain.setValueAtTime(0.6, now);
-            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
-            noise.connect(filter);
-            filter.connect(gain);
-            gain.connect(ctx.destination);
-            noise.start(now);
-            noise.stop(now + 0.35);
-        } else if (type === 'vote') {
-            const osc = ctx.createOscillator();
-            const gain = ctx.createGain();
-            osc.type = 'sine';
-            osc.frequency.setValueAtTime(320, now);
-            osc.frequency.exponentialRampToValueAtTime(120, now + 0.08);
-            gain.gain.setValueAtTime(0.2, now);
-            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
-            osc.connect(gain);
-            gain.connect(ctx.destination);
-            osc.start(now);
-            osc.stop(now + 0.09);
-        }
-    } catch (e) {}
-}
-
-function toggleSfx() {
-    sfxEnabled = !sfxEnabled;
-    localStorage.setItem("mafia_sfx", sfxEnabled ? "true" : "false");
-    const btn = document.getElementById("sfx-toggle-btn");
-    if (btn) btn.innerText = sfxEnabled ? "🔊" : "🔇";
-}
-
-// WebRTC Audio Mesh
-async function initVoiceChat() {
-    if (currentRoomMode !== "voice") return;
-    try {
-        if (!localAudioStream) {
-            localAudioStream = await navigator.mediaDevices.getUserMedia({
-                audio: {
-                    echoCancellation: true,
-                    noiseSuppression: true,
-                    autoGainControl: true
-                },
-                video: false
-            });
-        }
-
-        const AudioCtx = window.AudioContext || window.webkitAudioContext;
-        if (AudioCtx && !audioContext) {
-            audioContext = new AudioCtx();
-            const source = audioContext.createMediaStreamSource(localAudioStream);
-            analyserNode = audioContext.createAnalyser();
-            analyserNode.fftSize = 256;
-            source.connect(analyserNode);
-
-            const dataArray = new Uint8Array(analyserNode.frequencyBinCount);
-            const meterBar = document.getElementById("voice-mic-level");
-
-            clearInterval(micVolumeInterval);
-            micVolumeInterval = setInterval(() => {
-                if (!analyserNode || !localAudioStream) return;
-                analyserNode.getByteFrequencyData(dataArray);
-                let sum = 0;
-                for (let i = 0; i < dataArray.length; i++) {
-                    sum += dataArray[i];
-                }
-                const avg = sum / dataArray.length;
-                const percent = Math.min(100, Math.round((avg / 128) * 100));
-
-                if (meterBar) {
-                    meterBar.style.width = (canSpeak && !isMicMuted) ? `${percent}%` : `0%`;
-                }
-
-                const isSpeaking = (percent > 12 && canSpeak && !isMicMuted);
-                if (isSpeaking !== lastSpeakingState) {
-                    lastSpeakingState = isSpeaking;
-                    if (ws && ws.readyState === WebSocket.OPEN) {
-                        ws.send(JSON.stringify({
-                            action: "mic_status",
-                            is_muted: isMicMuted,
-                            is_speaking: isSpeaking
-                        }));
-                    }
-                    const me = currentPlayersData.find(p => p.id === userId);
-                    if (me) {
-                        me.is_speaking = isSpeaking;
-                        renderHorizontalPlayers();
-                    }
-                }
-            }, 100);
-        }
-
-        updateSpeechPermission();
-    } catch (err) {
-        console.warn("Mikrofon ruxsati olinmadi:", err);
-        const hint = document.getElementById("mic-hint-text");
-        if (hint) hint.innerText = "Mikrofon ruxsati berilmadi (Eshituvchi)";
-        const micBtn = document.getElementById("btn-toggle-mic");
-        if (micBtn) {
-            micBtn.className = "btn-mic-toggle mic-disabled";
-            document.getElementById("mic-label").innerText = "Mikrofon bloklangan";
-        }
-    }
-}
-
-function createPeerConnection(peerId, isInitiator) {
-    if (peerConnections[peerId]) return peerConnections[peerId];
-
-    const pc = new RTCPeerConnection(rtcConfig);
-    peerConnections[peerId] = pc;
-
-    if (localAudioStream) {
-        localAudioStream.getAudioTracks().forEach(track => {
-            pc.addTrack(track, localAudioStream);
-        });
-    }
-
-    pc.onicecandidate = (event) => {
-        if (event.candidate && ws && ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({
-                action: "webrtc_signal",
-                target_id: peerId,
-                signal: { candidate: event.candidate }
-            }));
-        }
-    };
-
-    pc.ontrack = (event) => {
-        let audioEl = document.getElementById(`audio-peer-${peerId}`);
-        if (!audioEl) {
-            audioEl = document.createElement("audio");
-            audioEl.id = `audio-peer-${peerId}`;
-            audioEl.autoplay = true;
-            audioEl.playsInline = true;
-            audioEl.style.display = "none";
-            document.body.appendChild(audioEl);
-        }
-        audioEl.srcObject = event.streams[0];
-        audioEl.play().catch(() => {});
-    };
-
-    pc.onconnectionstatechange = () => {
-        if (pc.connectionState === "disconnected" || pc.connectionState === "failed" || pc.connectionState === "closed") {
-            cleanupPeer(peerId);
-        }
-    };
-
-    if (isInitiator) {
-        pc.createOffer()
-            .then(offer => pc.setLocalDescription(offer))
-            .then(() => {
-                if (ws && ws.readyState === WebSocket.OPEN) {
-                    ws.send(JSON.stringify({
-                        action: "webrtc_signal",
-                        target_id: peerId,
-                        signal: pc.localDescription
-                    }));
-                }
-            })
-            .catch(e => console.warn("WebRTC offer error:", e));
-    }
-
-    return pc;
-}
-
-function handleWebRtcSignal(senderId, signal) {
-    if (!signal) return;
-    let pc = peerConnections[senderId];
-    if (!pc) {
-        pc = createPeerConnection(senderId, false);
-    }
-
-    if (signal.type === "offer") {
-        pc.setRemoteDescription(new RTCSessionDescription(signal))
-            .then(() => pc.createAnswer())
-            .then(answer => pc.setLocalDescription(answer))
-            .then(() => {
-                if (ws && ws.readyState === WebSocket.OPEN) {
-                    ws.send(JSON.stringify({
-                        action: "webrtc_signal",
-                        target_id: senderId,
-                        signal: pc.localDescription
-                    }));
-                }
-            })
-            .catch(e => console.warn("WebRTC answer error:", e));
-    } else if (signal.type === "answer") {
-        pc.setRemoteDescription(new RTCSessionDescription(signal))
-            .catch(e => console.warn("setRemoteDescription answer error:", e));
-    } else if (signal.candidate) {
-        pc.addIceCandidate(new RTCIceCandidate(signal.candidate))
-            .catch(e => console.warn("addIceCandidate error:", e));
-    }
-}
-
-function cleanupPeer(peerId) {
-    if (peerConnections[peerId]) {
-        try { peerConnections[peerId].close(); } catch(e) {}
-        delete peerConnections[peerId];
-    }
-    const audioEl = document.getElementById(`audio-peer-${peerId}`);
-    if (audioEl) audioEl.remove();
-}
-
-function cleanupAllVoiceChat() {
-    clearInterval(micVolumeInterval);
-    micVolumeInterval = null;
-    for (const peerId in peerConnections) {
-        cleanupPeer(peerId);
-    }
-    peerConnections = {};
-    if (localAudioStream) {
-        localAudioStream.getTracks().forEach(t => t.stop());
-        localAudioStream = null;
-    }
-    if (audioContext) {
-        try { audioContext.close(); } catch(e) {}
-        audioContext = null;
-        analyserNode = null;
-    }
-}
-
-function toggleMicrophone() {
-    if (!canSpeak) {
-        alert("Hozir sizning navbatingiz emas yoki shahar uxlamoqda!");
-        return;
-    }
-    isMicMuted = !isMicMuted;
-    updateSpeechPermission();
-    if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({
-            action: "mic_status",
-            is_muted: isMicMuted,
-            is_speaking: false
-        }));
-    }
-}
-
-function updateSpeechPermission() {
-    if (currentRoomMode !== "voice") {
-        const vPanel = document.getElementById("voice-control-panel");
-        const vBanner = document.getElementById("voice-speaker-banner");
-        if (vPanel) vPanel.style.display = "none";
-        if (vBanner) vBanner.style.display = "none";
-        return;
-    }
-
-    const vPanel = document.getElementById("voice-control-panel");
-    if (vPanel) vPanel.style.display = "flex";
-
-    const badge = document.getElementById("in-game-mode-badge");
-    if (badge) {
-        badge.innerText = (currentRoomMode === "voice") ? "🎙️ OVOZLI" : "💬 CHATLI";
-        badge.className = (currentRoomMode === "voice") ? "badge-voice-mode" : "room-tag chat-tag";
-    }
-
-    if (!isAlive) {
-        canSpeak = false;
-    } else if (isLastWordPhase) {
-        canSpeak = (lastWordSpeakerId === userId);
-    } else if (currentPhaseName === "night") {
-        canSpeak = false;
-    } else if (currentPhaseName === "discussion") {
-        if (currentVoiceType === "turn" && !isFreeTalk) {
-            canSpeak = (currentSpeakerId === userId);
-        } else {
-            canSpeak = true;
-        }
-    } else if (currentPhaseName === "voting" || currentPhaseName === "lobby" || currentPhaseName === "game_over") {
-        canSpeak = true;
-    } else {
-        canSpeak = true;
-    }
-
-    if (localAudioStream) {
-        localAudioStream.getAudioTracks().forEach(track => {
-            track.enabled = canSpeak && !isMicMuted;
-        });
-    }
-
-    const micBtn = document.getElementById("btn-toggle-mic");
-    const micIcon = document.getElementById("mic-icon");
-    const micLabel = document.getElementById("mic-label");
-    const micHint = document.getElementById("mic-hint-text");
-    const finishBtn = document.getElementById("btn-finish-turn");
-
-    if (finishBtn) {
-        finishBtn.style.display = (canSpeak && currentSpeakerId === userId && !isFreeTalk && currentPhaseName === "discussion") ? "block" : "none";
-    }
-
-    if (micBtn && micIcon && micLabel && micHint) {
-        if (!canSpeak) {
-            micBtn.className = "btn-mic-toggle mic-disabled";
-            micIcon.innerText = "🔇";
-            if (!isAlive) {
-                micLabel.innerText = "Kuzatuvchi (O'chirilgan)";
-                micHint.innerText = "Siz o'yindan chiqqansiz";
-            } else if (currentPhaseName === "night") {
-                micLabel.innerText = "Tun: Shahar uxlamoqda";
-                micHint.innerText = "Jimjitlik saqlanmoqda";
-            } else if (isLastWordPhase) {
-                micLabel.innerText = "Oxirgi so'z vaqti";
-                micHint.innerText = "Faqat qurbon gapirmoqda";
-            } else {
-                micLabel.innerText = "Navbat kutilmoqda";
-                micHint.innerText = "Boshqalar gapirmoqda";
-            }
-        } else if (isMicMuted) {
-            micBtn.className = "btn-mic-toggle mic-muted";
-            micIcon.innerText = "🔇";
-            micLabel.innerText = "Mikrofon: O'chirilgan";
-            micHint.innerText = "Yoqish uchun bosing";
-        } else {
-            micBtn.className = "btn-mic-toggle mic-active";
-            micIcon.innerText = "🎙️";
-            micLabel.innerText = "Mikrofon: Yoqilgan";
-            micHint.innerText = (currentSpeakerId === userId && !isFreeTalk) ? "👑 Sizning navbatingiz!" : "Jonli suhbat";
-        }
-    }
-}
-
-function finishMyTurn() {
-    if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ action: "skip_turn" }));
-    }
-}
-
 const roleAssets = {
     rais: {
         title: "👑 RAIS",
@@ -837,7 +424,7 @@ function closeGuideModal() {
 }
 
 function switchGuideTab(tabName) {
-    const tabs = ['rules', 'voice', 'about', 'roles'];
+    const tabs = ['rules', 'about', 'roles'];
     tabs.forEach(t => {
         const btn = document.getElementById(`tab-btn-${t}`);
         const content = document.getElementById(`guide-tab-${t}`);
@@ -846,40 +433,8 @@ function switchGuideTab(tabName) {
     });
 }
 
-function selectRoomMode(mode) {
-    selectedRoomMode = mode;
-    const vBtn = document.getElementById("mode-opt-voice");
-    const cBtn = document.getElementById("mode-opt-chat");
-    if (vBtn) vBtn.classList.toggle("active", mode === "voice");
-    if (cBtn) cBtn.classList.toggle("active", mode === "chat");
-    const vtBlock = document.getElementById("voice-type-block");
-    if (vtBlock) {
-        vtBlock.style.display = (mode === "voice") ? "block" : "none";
-    }
-}
-
-function selectVoiceType(type) {
-    selectedVoiceType = type;
-    const tBtn = document.getElementById("vtype-turn");
-    const fBtn = document.getElementById("vtype-free");
-    if (tBtn) tBtn.classList.toggle("active", type === "turn");
-    if (fBtn) fBtn.classList.toggle("active", type === "free");
-}
-
-function filterRoomsMode(mode) {
-    currentRoomsFilter = mode;
-    const allBtn = document.getElementById("rf-all");
-    const vBtn = document.getElementById("rf-voice");
-    const cBtn = document.getElementById("rf-chat");
-    if (allBtn) allBtn.classList.toggle("active", mode === "all");
-    if (vBtn) vBtn.classList.toggle("active", mode === "voice");
-    if (cBtn) cBtn.classList.toggle("active", mode === "chat");
-    refreshRooms();
-}
-
 function refreshRooms() {
-    const q = (currentRoomsFilter && currentRoomsFilter !== "all") ? `?mode=${currentRoomsFilter}` : "";
-    fetch(`/api/rooms${q}`)
+    fetch("/api/rooms")
         .then(r => r.json())
         .then(data => {
             const list = document.getElementById("rooms-list");
@@ -893,7 +448,6 @@ function refreshRooms() {
                 const el = document.createElement("div");
                 el.className = "room-card-modern";
                 el.onclick = () => joinRoom(r.id);
-                const isVoice = (r.mode === "voice");
                 el.innerHTML = `
                     <div class="room-title-row">
                         <span class="room-title-name">${r.name}</span>
@@ -904,9 +458,8 @@ function refreshRooms() {
                         <span class="room-author-name">${r.host_name}</span>
                     </div>
                     <div class="room-tags-row">
-                        <span class="room-tag ${isVoice ? 'voice-tag' : 'chat-tag'}">${isVoice ? '🎙️ Ovozli' : '💬 Chatli'}</span>
+                        <span class="room-tag chat-tag">💬 Chatli</span>
                         <span class="room-tag">⏱ ${r.time_min} daq muhokama</span>
-                        ${isVoice && r.voice_type === 'turn' ? '<span class="room-tag">⏱️ 30s navbat</span>' : ''}
                     </div>
                 `;
                 list.appendChild(el);
@@ -925,8 +478,7 @@ function quickJoin() {
         openProfile(true);
         return;
     }
-    const q = (currentRoomsFilter && currentRoomsFilter !== "all") ? `?mode=${currentRoomsFilter}` : "";
-    fetch(`/api/quick_join${q}`)
+    fetch("/api/quick_join")
         .then(r => r.json())
         .then(d => {
             if (d.room_id) joinRoom(d.room_id);
@@ -940,8 +492,7 @@ function confirmCreateRoom() {
         alert("Xona yaratish uchun avval rasmiy kanalimizga obuna bo'ling!");
         return;
     }
-    const defName = (selectedRoomMode === "voice") ? "🎙️ Ovozli xona" : "💬 Bordo xona";
-    const rName = document.getElementById("cr-room-name").value.trim() || defName;
+    const rName = document.getElementById("cr-room-name").value.trim() || "💬 Bordo xona";
     const hostAva = userAvatar.startsWith("data:") ? presetAvatars[0] : userAvatar;
     fetch("/api/create_room", {
         method: "POST",
@@ -950,9 +501,7 @@ function confirmCreateRoom() {
             name: rName,
             time_sec: selectedTimerMinutes,
             host_name: userName,
-            host_avatar: hostAva,
-            mode: selectedRoomMode,
-            voice_type: selectedVoiceType
+            host_avatar: hostAva
         })
     })
     .then(r => r.json())
@@ -993,38 +542,7 @@ function joinRoom(roomId) {
         const d = JSON.parse(event.data);
 
         if (d.type === "room_info") {
-            currentRoomMode = d.mode || "voice";
-            currentVoiceType = d.voice_type || "turn";
-            currentSpeakerId = d.current_speaker_id || null;
             document.getElementById("in-game-room-name").innerText = d.name;
-            const modeBadge = document.getElementById("in-game-mode-badge");
-            if (modeBadge) {
-                modeBadge.innerText = (currentRoomMode === "voice") ? "🎙️ OVOZLI" : "💬 CHATLI";
-                modeBadge.className = (currentRoomMode === "voice") ? "badge-voice-mode" : "room-tag chat-tag";
-            }
-            if (currentRoomMode === "voice") {
-                initVoiceChat();
-            }
-            updateSpeechPermission();
-        }
-        else if (d.type === "peer_joined") {
-            if (currentRoomMode === "voice" && d.user_id !== userId) {
-                createPeerConnection(d.user_id, true);
-            }
-        }
-        else if (d.type === "peer_left") {
-            cleanupPeer(d.user_id);
-        }
-        else if (d.type === "webrtc_signal") {
-            handleWebRtcSignal(d.sender_id, d.signal);
-        }
-        else if (d.type === "player_mic_status") {
-            const targetPlayer = currentPlayersData.find(p => p.id === d.user_id);
-            if (targetPlayer) {
-                targetPlayer.is_muted = d.is_muted;
-                targetPlayer.is_speaking = d.is_speaking;
-                renderHorizontalPlayers();
-            }
         }
         else if (d.type === "is_admin") {
             isHost = true;
@@ -1128,37 +646,8 @@ function handlePhaseChange(d) {
     currentVotesData = {};
     renderHorizontalPlayers();
 
-    currentPhaseName = d.phase;
-    currentSpeakerId = d.speaker_id || null;
-    isFreeTalk = !!d.is_free_talk;
     isLastWordPhase = (d.phase === "last_word");
     lastWordSpeakerId = d.speaker_id || null;
-
-    // SFX ijro etish
-    if (d.phase === "discussion") playSfx('gong');
-    else if (d.phase === "night") playSfx('night');
-    else if (d.phase === "voting") playSfx('vote');
-    else if (d.phase === "last_word") playSfx('shot');
-    else if (d.phase === "game_over") playSfx('ding');
-
-    // Faol gapiruvchi banneri
-    const vBanner = document.getElementById("voice-speaker-banner");
-    const vSpkName = document.getElementById("voice-speaker-name");
-    if (vBanner) {
-        if (currentRoomMode === "voice" && d.speaker_id) {
-            vBanner.style.display = "flex";
-            if (d.speaker_id === "all") {
-                if (vSpkName) vSpkName.innerText = "📢 Umumiy erkin bahs (Barcha o'yinchilar)";
-            } else {
-                if (vSpkName) vSpkName.innerText = `🎙️ Nutq navbati: ${d.speaker_name || 'O\'yinchi'}`;
-                if (d.speaker_id === userId) {
-                    playSfx('ding');
-                }
-            }
-        } else {
-            vBanner.style.display = "none";
-        }
-    }
 
     // Orqa fonni kun/tun fazasiga qarab siljitish
     if (d.phase === "night") {
@@ -1311,8 +800,6 @@ function handlePhaseChange(d) {
             restartBtn.style.display = "block";
         }
     }
-
-    updateSpeechPermission();
 }
 
 function revealRais() {
@@ -1342,17 +829,9 @@ function renderHorizontalPlayers() {
             if (target === p.id) voteCount++;
         }
 
-        const isSpeaking = !!p.is_speaking;
-        const isMuted = !!p.is_muted;
-
         col.innerHTML = `
             <div style="position:relative; display:inline-block;">
-                <img src="${p.avatar || presetAvatars[0]}" class="player-avatar-circle ${isSpeaking ? 'is-speaking' : ''}">
-                ${currentRoomMode === 'voice' ? `
-                    <span class="player-mic-badge ${isSpeaking ? 'speaking' : (isMuted ? 'muted' : '')}">
-                        ${isSpeaking ? '🎙️' : (isMuted ? '🔇' : '🎙️')}
-                    </span>
-                ` : ''}
+                <img src="${p.avatar || presetAvatars[0]}" class="player-avatar-circle">
                 ${p.rais_revealed ? '<span style="position:absolute; bottom:-3px; right:-3px; font-size:0.75rem;" title="Rais (Ovozi 2x)">👑</span>' : ''}
             </div>
             <span class="player-bubble-name">${p.rais_revealed ? '👑 ' : ''}${p.name}</span>
@@ -1427,7 +906,6 @@ function leaveRoom() {
 }
 
 function leaveRoomLocally() {
-    cleanupAllVoiceChat();
     currentRoomId = null;
     isHost = false;
     document.getElementById("screen-game").style.display = "none";

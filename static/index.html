@@ -36,12 +36,6 @@
                 <span id="active-rooms-count">0 ta xona</span>
             </div>
 
-            <div class="room-filter-tabs">
-                <button class="room-filter-btn active" id="rf-all" onclick="filterRoomsMode('all')">🌐 Barchasi</button>
-                <button class="room-filter-btn" id="rf-voice" onclick="filterRoomsMode('voice')">🎙️ Ovozli</button>
-                <button class="room-filter-btn" id="rf-chat" onclick="filterRoomsMode('chat')">💬 Chatli</button>
-            </div>
-
             <div id="rooms-list" class="rooms-list-container"></div>
         </div>
 
@@ -50,14 +44,10 @@
             <div class="game-top-nav">
                 <button class="gold-icon-btn" style="width:34px; height:34px; font-size:0.9rem;" onclick="leaveRoom()">←</button>
                 <div class="game-top-center">
-                    <div style="display:flex; align-items:center; justify-content:center; gap:6px;">
-                        <span id="in-game-room-name" class="game-room-name">Xona</span>
-                        <span id="in-game-mode-badge" class="badge-voice-mode">🎙️ OVOZLI</span>
-                    </div>
+                    <div id="in-game-room-name" class="game-room-name">Xona</div>
                     <div id="in-game-room-stats" class="game-players-count-sub">0/16 o'yinchi</div>
                 </div>
                 <div style="display:flex; gap:6px; align-items:center;">
-                    <button class="gold-icon-btn" id="sfx-toggle-btn" style="width:34px; height:34px; font-size:0.9rem;" onclick="toggleSfx()" title="Tovushlar">🔊</button>
                     <button class="gold-icon-btn" style="width:34px; height:34px; font-size:0.9rem;" onclick="openGuideModal('rules')" title="Qo'llanma va Qoidalar">📖</button>
                     <button id="host-start-btn" style="display:none; background:var(--green); border:none; color:#fff; border-radius:10px; padding:6px 12px; font-size:0.75rem; font-weight:700;" onclick="startGame()">Boshlash</button>
                     <button id="host-restart-btn" style="display:none; background:var(--gold); border:none; color:#0c0f17; border-radius:10px; padding:6px 12px; font-size:0.75rem; font-weight:800;" onclick="restartGame()">🔄 Yangi o'yin</button>
@@ -72,21 +62,6 @@
                 <span id="game-timer" style="font-weight:900; color:var(--blue);">01:00</span>
             </div>
 
-            <!-- OVOZLI XONA: FAOL GAPIRUVCHI BANNERI -->
-            <div id="voice-speaker-banner" class="voice-speaker-card" style="display:none;">
-                <div class="voice-speaker-info">
-                    <span class="voice-pulse-dot"></span>
-                    <span id="voice-speaker-name" class="voice-speaker-title">🎙️ Nutq navbati: Ali</span>
-                    <div class="voice-eq-bars">
-                        <span class="eq-bar bar-1"></span>
-                        <span class="eq-bar bar-2"></span>
-                        <span class="eq-bar bar-3"></span>
-                        <span class="eq-bar bar-4"></span>
-                    </div>
-                </div>
-                <button id="btn-finish-turn" class="btn-finish-turn" style="display:none;" onclick="finishMyTurn()">Tugatdim ⏭</button>
-            </div>
-
             <div id="rais-action-bar" style="display:none; padding:8px 12px; background:rgba(245, 176, 65, 0.12); border-bottom:1px solid rgba(245,176,65,0.3); text-align:center;">
                 <button id="btn-reveal-rais" class="btn-quick-join" style="height:36px; font-size:0.78rem; background:linear-gradient(135deg, #f5b041, #d48806); color:#0c0f17; font-weight:800; border:none; box-shadow:0 0 10px rgba(245,176,65,0.4);" onclick="revealRais()">
                     👑 Rais ekanimni ochiqlash (Ovozim 2x)
@@ -99,18 +74,6 @@
             </div>
 
             <div id="chat-messages" class="telegram-chat-area"></div>
-
-            <!-- OVOZLI BOSHQARUV PANELI (MIKROFON TUGMASI VA INDIKATOR) -->
-            <div id="voice-control-panel" class="voice-control-bar" style="display:none;">
-                <button id="btn-toggle-mic" class="btn-mic-toggle mic-active" onclick="toggleMicrophone()">
-                    <span id="mic-icon" class="mic-glyph">🎙️</span>
-                    <span id="mic-label" class="mic-status-text">Mikrofon: Yoqilgan</span>
-                </button>
-                <div class="voice-mic-meter-box" title="Ovoz darajasi">
-                    <div id="voice-mic-level" class="voice-mic-level-bar"></div>
-                </div>
-                <span id="mic-hint-text" class="voice-mic-hint">Siz gapirishingiz mumkin</span>
-            </div>
 
             <div class="chat-bottom-input-bar">
                 <input type="text" id="chat-input" class="chat-input-modern" placeholder="Xabaringizni yozing..." maxlength="200" onkeydown="if(event.key==='Enter') sendChat()">
@@ -170,30 +133,6 @@
                 <h3 style="margin-bottom: 10px; font-size:1rem; text-align:center;">🎮 Yangi xona yaratish</h3>
                 
                 <div class="input-field-block">
-                    <label>Xona formati:</label>
-                    <div class="mode-select-grid">
-                        <button type="button" class="mode-tab-btn active" id="mode-opt-voice" onclick="selectRoomMode('voice')">
-                            <span style="font-size:1.1rem; display:block;">🎙️</span>
-                            <b>Ovozli Mafia</b>
-                            <small style="display:block; font-size:0.65rem; opacity:0.8;">Jonli mikrofon & suhbat</small>
-                        </button>
-                        <button type="button" class="mode-tab-btn" id="mode-opt-chat" onclick="selectRoomMode('chat')">
-                            <span style="font-size:1.1rem; display:block;">💬</span>
-                            <b>Chatli Mafia</b>
-                            <small style="display:block; font-size:0.65rem; opacity:0.8;">Yozishmali matn</small>
-                        </button>
-                    </div>
-                </div>
-
-                <div class="input-field-block" id="voice-type-block">
-                    <label>Nutq tartibi (Ovozli rejim):</label>
-                    <div class="time-tabs">
-                        <button type="button" class="time-tab-btn active" id="vtype-turn" onclick="selectVoiceType('turn')">⏱️ Navbatma-navbat</button>
-                        <button type="button" class="time-tab-btn" id="vtype-free" onclick="selectVoiceType('free')">🗣️ Erkin bahs</button>
-                    </div>
-                </div>
-
-                <div class="input-field-block">
                     <label>Xona nomi:</label>
                     <input type="text" id="cr-room-name" class="input-modern" placeholder="Masalan: Bordo xona" maxlength="25">
                 </div>
@@ -231,10 +170,9 @@
                     <button class="guide-close-btn" onclick="closeGuideModal()">✕</button>
                 </div>
 
-                <!-- TABLAR: 1. Yo'riqnoma, 2. O'yin haqida, 3. Rollar, 4. Ovozli Mafia -->
+                <!-- TABLAR: 1. Yo'riqnoma, 2. O'yin haqida, 3. Rollar -->
                 <div class="guide-tabs">
                     <button class="guide-tab-btn active" id="tab-btn-rules" onclick="switchGuideTab('rules')">📜 Yo'riqnoma</button>
-                    <button class="guide-tab-btn" id="tab-btn-voice" onclick="switchGuideTab('voice')">🎙️ Ovozli Mafia</button>
                     <button class="guide-tab-btn" id="tab-btn-about" onclick="switchGuideTab('about')">ℹ️ Haqida</button>
                     <button class="guide-tab-btn" id="tab-btn-roles" onclick="switchGuideTab('roles')">🎭 Rollar</button>
                 </div>
@@ -545,53 +483,7 @@
 
                 </div>
 
-                <!-- 4-TAB: OVOZLI MAFIA QOIDALARI -->
-                <div id="guide-tab-voice" class="guide-tab-content" style="display:none;">
-                    <div class="guide-banner-card">
-                        <strong style="color:var(--green); display:block; margin-bottom:4px;">🎙️ Ovozli Mafia (Voice Club):</strong>
-                        Haqiqiy professional mafia klublaridagidek jonli mikrofon orqali o'ynaladi. So'zlash, psixologiya, intonatsiya va isbotlar orqali raqiblaringizni fosh qilasiz!
-                    </div>
 
-                    <div class="guide-step-card">
-                        <div class="guide-step-header">
-                            <span class="guide-step-num" style="background:#2ecc71; color:#fff;">1</span>
-                            <span class="guide-step-title">🎙️ Mikrofon boshqaruvi</span>
-                        </div>
-                        <div class="guide-step-desc">
-                            O'yinga kirganingizda mikrofoningizni yoqishingiz (Mute/Unmute) mumkin. Pastdagi katta tugma orqali mikrofon holatini boshqarasiz. Gapirganingizda profilingiz atrofida yashil neon to'lqin yonadi.
-                        </div>
-                    </div>
-
-                    <div class="guide-step-card">
-                        <div class="guide-step-header">
-                            <span class="guide-step-num" style="background:#f5b041; color:#0c0f17;">2</span>
-                            <span class="guide-step-title">⏱️ Navbat bilan nutq (30s)</span>
-                        </div>
-                        <div class="guide-step-desc">
-                            Navbatma-navbat rejimida har bir o'yinchiga 30 soniya maxsus nutq navbati beriladi. Bu paytda faqat u gapiradi, boshqalar tinglaydi. O'z nutqingizni tugatsangiz, «Tugatdim» tugmasini bosishingiz mumkin.
-                        </div>
-                    </div>
-
-                    <div class="guide-step-card">
-                        <div class="guide-step-header">
-                            <span class="guide-step-num" style="background:#5b7fff; color:#fff;">3</span>
-                            <span class="guide-step-title">📢 Umumiy erkin bahs (45s)</span>
-                        </div>
-                        <div class="guide-step-desc">
-                            Barcha o'yinchilar yakka nutqini so'zlagach, 45 soniya barcha tirik fuqarolarga umumiy erkin bahs huquqi beriladi.
-                        </div>
-                    </div>
-
-                    <div class="guide-step-card">
-                        <div class="guide-step-header">
-                            <span class="guide-step-num" style="background:#ff4757; color:#fff;">4</span>
-                            <span class="guide-step-title">🎤 Oxirgi so'z va Tungi sukunat</span>
-                        </div>
-                        <div class="guide-step-desc">
-                            Ovoz berishda ko'pchilik ovoz olgan o'yinchiga 20 soniya ovozli oxirgi so'z beriladi. Kechasi esa shahar uxlaydi va barcha fuqarolarning mikrofoni avtomatik jimjitlik rejimiga o'tadi!
-                        </div>
-                    </div>
-                </div>
 
                 <div style="margin-top: 10px;">
                     <button class="btn-quick-join" style="width:100%; height:40px;" onclick="closeGuideModal()">Tushundim</button>

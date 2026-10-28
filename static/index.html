@@ -74,14 +74,20 @@
                 <div id="action-buttons-box" style="display:flex; flex-wrap:wrap; gap:6px;"></div>
             </div>
 
-            <!-- MAFIA VA UMUMIY CHAT TABLARI (Faqat mafialarga ko'rinadi) -->
-            <div id="chat-tabs-bar" class="chat-tabs-bar" style="display:none;">
-                <button id="tab-chat-public" class="chat-tab-btn active" onclick="switchChatTab('public')">
-                    💬 Umumiy chat
-                </button>
-                <button id="tab-chat-mafia" class="chat-tab-btn mafia-tab" onclick="switchChatTab('mafia')">
-                    🕶️ Mafia chati <span id="mafia-chat-badge" style="display:none; background:var(--red); color:#fff; font-size:0.6rem; padding:1px 5px; border-radius:8px; margin-left:3px;">1</span>
-                </button>
+            <!-- CHAT BOSHQARUV PANEL VA TABLARI -->
+            <div class="chat-header-actions-bar" style="background:var(--panel); border-bottom:1px solid var(--border); padding:5px 12px; display:flex; justify-content:space-between; align-items:center;">
+                <div id="chat-tabs-bar" class="chat-tabs-bar" style="display:none; padding:0; border:none; background:none;">
+                    <button id="tab-chat-public" class="chat-tab-btn active" onclick="switchChatTab('public')">
+                        💬 Umumiy
+                    </button>
+                    <button id="tab-chat-mafia" class="chat-tab-btn mafia-tab" onclick="switchChatTab('mafia')">
+                        🕶️ Mafia <span id="mafia-chat-badge" style="display:none; background:var(--red); color:#fff; font-size:0.6rem; padding:1px 5px; border-radius:8px; margin-left:3px;">1</span>
+                    </button>
+                </div>
+                <div id="chat-public-title-sub" style="font-size:0.75rem; font-weight:700; color:var(--text-muted); display:flex; align-items:center; gap:4px;">
+                    💬 Chat zali
+                </div>
+                <button class="gold-icon-btn" style="width:28px; height:28px; font-size:0.75rem; border-radius:8px;" onclick="clearLocalChat()" title="Chatni tozalash">🗑️</button>
             </div>
 
             <div id="chat-messages" class="telegram-chat-area"></div>
@@ -170,6 +176,44 @@
                 <h3 id="role-title-card" style="font-size:1rem; color:var(--gold);">ROL</h3>
                 <p id="role-desc-card" style="font-size:0.75rem; color:var(--text-muted); margin:6px 0 12px; text-align:left; line-height:1.4;"></p>
                 <button class="btn-quick-join" style="width:100%; height:38px;" onclick="document.getElementById('modal-role').style.display='none'">Tushundim</button>
+            </div>
+        </div>
+
+        <!-- 5.1 BOSHQA O'YINCHI PROFILI VA STATISTIKASI (CARD) -->
+        <div id="modal-player-card" class="modal-overlay" style="display: none;" onclick="if(event.target===this) closePlayerCardModal()">
+            <div class="modal-content-panel" style="text-align:center; max-width:320px; position:relative;">
+                <button style="position:absolute; top:10px; right:12px; background:none; border:none; color:var(--text-muted); font-size:1.1rem; cursor:pointer;" onclick="closePlayerCardModal()">✕</button>
+                <div style="position:relative; display:inline-block; margin-top:6px;">
+                    <img id="card-player-avatar" src="" style="width:72px; height:72px; border-radius:50%; object-fit:cover; border:2.5px solid var(--gold); box-shadow:0 0 15px rgba(245, 176, 65, 0.35);">
+                    <span id="card-player-status-badge" style="position:absolute; bottom:0; right:0; font-size:0.75rem;">🟢</span>
+                </div>
+                <h3 id="card-player-name" style="margin:8px 0 2px; font-size:1.05rem; color:var(--text);">O'yinchi</h3>
+                <div id="card-player-id" style="font-size:0.7rem; color:var(--text-muted); margin-bottom:10px;">ID: 12345678</div>
+                
+                <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:8px; margin:10px 0;">
+                    <div style="background:var(--card); border:1px solid var(--border); border-radius:10px; padding:8px 6px;">
+                        <div id="card-player-games" style="font-size:1rem; font-weight:800; color:var(--blue);">0</div>
+                        <div style="font-size:0.62rem; color:var(--text-muted);">O'yinlar</div>
+                    </div>
+                    <div style="background:var(--card); border:1px solid var(--border); border-radius:10px; padding:8px 6px;">
+                        <div id="card-player-wins" style="font-size:1rem; font-weight:800; color:var(--green);">0</div>
+                        <div style="font-size:0.62rem; color:var(--text-muted);">G'alabalar</div>
+                    </div>
+                    <div style="background:var(--card); border:1px solid var(--border); border-radius:10px; padding:8px 6px;">
+                        <div id="card-player-rate" style="font-size:1rem; font-weight:800; color:var(--gold);">0%</div>
+                        <div style="font-size:0.62rem; color:var(--text-muted);">Yutuq darajasi</div>
+                    </div>
+                    <div style="background:var(--card); border:1px solid var(--border); border-radius:10px; padding:8px 6px;">
+                        <div id="card-player-mafia-rate" style="font-size:1rem; font-weight:800; color:var(--red);">0%</div>
+                        <div style="font-size:0.62rem; color:var(--text-muted);">Mafia g'alabasi</div>
+                    </div>
+                </div>
+
+                <div id="card-player-extra-status" style="font-size:0.74rem; color:var(--text-muted); margin-bottom:14px; background:rgba(255,255,255,0.03); padding:6px 10px; border-radius:8px;">
+                    Holati: Tirik fuqaro
+                </div>
+
+                <button class="btn-quick-join" style="width:100%; height:38px;" onclick="closePlayerCardModal()">Yopish</button>
             </div>
         </div>
 

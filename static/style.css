@@ -1206,3 +1206,38 @@ body.light-theme .app-wrapper {
   0% { transform: scale(1); filter: drop-shadow(0 0 2px rgba(255, 71, 87, 0.4)); }
   100% { transform: scale(1.12); filter: drop-shadow(0 0 10px rgba(255, 71, 87, 0.95)); }
 }
+
+/* Chat xabarini o'chirish tugmasi */
+.msg-delete-btn {
+  background: transparent;
+  border: none;
+  font-size: 0.7rem;
+  opacity: 0.35;
+  cursor: pointer;
+  padding: 1px 4px;
+  line-height: 1;
+  transition: all 0.2s ease;
+  color: var(--text-muted);
+}
+
+.tg-msg-bubble:hover .msg-delete-btn {
+  opacity: 0.85;
+}
+
+.msg-delete-btn:hover {
+  opacity: 1 !important;
+  transform: scale(1.22);
+  color: #ff4757;
+}
+
+.player-avatar-circle,
+.tg-msg-avatar {
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.player-avatar-circle:hover,
+.tg-msg-avatar:hover {
+  transform: scale(1.1);
+  box-shadow: 0 0 8px rgba(245, 176, 65, 0.5);
+}

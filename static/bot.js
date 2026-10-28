@@ -622,8 +622,12 @@ function joinRoom(roomId) {
             myRole = d.role;
             const isMafiaMember = ["mafia", "mafiaboshi", "xufya"].includes(myRole);
             const chatTabsBar = document.getElementById("chat-tabs-bar");
+            const chatPublicTitle = document.getElementById("chat-public-title-sub");
             if (chatTabsBar) {
                 chatTabsBar.style.display = isMafiaMember ? "flex" : "none";
+            }
+            if (chatPublicTitle) {
+                chatPublicTitle.style.display = isMafiaMember ? "none" : "flex";
             }
             const r = roleAssets[myRole] || roleAssets.citizen;
             document.getElementById("role-img-card").src = r.img;
@@ -672,8 +676,17 @@ function joinRoom(roomId) {
             currentVotesData = d.votes;
             renderHorizontalPlayers();
         }
+        else if (d.type === "msg_deleted") {
+            const el = document.getElementById("msg-" + d.msg_id);
+            if (el) {
+                el.style.transition = "all 0.3s ease";
+                el.style.opacity = "0";
+                el.style.transform = "scale(0.85)";
+                setTimeout(() => el.remove(), 300);
+            }
+        }
         else if (d.type === "chat") {
-            appendChatBubble(d.sender, d.avatar, d.text, d.is_self, d.is_system, d.is_last_word, d.is_mafia, d.role);
+            appendChatBubble(d.sender, d.avatar, d.text, d.is_self, d.is_system, d.is_last_word, d.is_mafia, d.role, d.msg_id, d.sender_id);
         }
     };
 
@@ -907,15 +920,85 @@ function renderHorizontalPlayers() {
         }
 
         col.innerHTML = `
-            <div style="position:relative; display:inline-block;">
-                <img src="${p.avatar || presetAvatars[0]}" class="player-avatar-circle">
+            <div style="position:relative; display:inline-block; cursor:pointer;" onclick="openPlayerCard('${p.id}')">
+                <img src="${p.avatar || presetAvatars[0]}" class="player-avatar-circle" title="${p.name} profilini ko'rish">
                 ${p.rais_revealed ? '<span style="position:absolute; bottom:-3px; right:-3px; font-size:0.75rem;" title="Rais (Ovozi 2x)">👑</span>' : ''}
             </div>
-            <span class="player-bubble-name">${p.rais_revealed ? '👑 ' : ''}${p.name}</span>
+            <span class="player-bubble-name" style="cursor:pointer;" onclick="openPlayerCard('${p.id}')">${p.rais_revealed ? '👑 ' : ''}${p.name}</span>
             ${voteCount > 0 ? `<span class="vote-badge-count">${voteCount}</span>` : ''}
         `;
         box.appendChild(col);
     });
+}
+
+function openPlayerCard(targetId) {
+    if (!targetId) return;
+    const p = currentPlayersData.find(item => String(item.id) === String(targetId));
+    
+    const avaEl = document.getElementById("card-player-avatar");
+    const nameEl = document.getElementById("card-player-name");
+    const idEl = document.getElementById("card-player-id");
+    const statusEl = document.getElementById("card-player-status-badge");
+    const gamesEl = document.getElementById("card-player-games");
+    const winsEl = document.getElementById("card-player-wins");
+    const rateEl = document.getElementById("card-player-rate");
+    const mafiaRateEl = document.getElementById("card-player-mafia-rate");
+    const extraEl = document.getElementById("card-player-extra-status");
+
+    if (p) {
+        if (avaEl) avaEl.src = p.avatar || presetAvatars[0];
+        if (nameEl) nameEl.innerText = (p.is_bot ? '🤖 ' : '') + p.name;
+        if (idEl) idEl.innerText = (p.is_bot ? '🤖 Test boti' : `ID: ${p.id}`);
+        if (statusEl) statusEl.innerText = p.is_alive ? '🟢' : '🔴';
+        if (gamesEl) gamesEl.innerText = p.games || 0;
+        if (winsEl) winsEl.innerText = p.wins || 0;
+        if (rateEl) rateEl.innerText = p.rate || '0%';
+        if (mafiaRateEl) mafiaRateEl.innerText = p.mafia_rate || '0%';
+        
+        let stateTxt = p.is_alive ? '🟢 Shahar aholisi (Tirik)' : '🔴 O\'yindan chiqqan (O\'lik)';
+        if (p.rais_revealed) stateTxt = '👑 Rais (Ovozi 2x, Tirik)';
+        if (extraEl) extraEl.innerText = `Holati: ${stateTxt}`;
+    } else {
+        if (avaEl) avaEl.src = presetAvatars[0];
+        if (nameEl) nameEl.innerText = "O'yinchi";
+        if (idEl) idEl.innerText = `ID: ${targetId}`;
+    }
+
+    // Serverdan yangilangan ma'lumotlarni tekshirib olish
+    fetch(`/api/user_stats/${targetId}`)
+        .then(r => r.json())
+        .then(d => {
+            if (d && d.name) {
+                if (nameEl && (!p || !p.is_bot)) nameEl.innerText = d.name;
+                if (gamesEl) gamesEl.innerText = d.games;
+                if (winsEl) winsEl.innerText = d.wins;
+                if (rateEl) rateEl.innerText = d.rate;
+                if (mafiaRateEl) mafiaRateEl.innerText = d.mafia_rate;
+            }
+        })
+        .catch(() => {});
+
+    const modal = document.getElementById("modal-player-card");
+    if (modal) modal.style.display = "flex";
+}
+
+function closePlayerCardModal() {
+    const modal = document.getElementById("modal-player-card");
+    if (modal) modal.style.display = "none";
+}
+
+function deleteChatMessage(msgId) {
+    if (!msgId || !ws) return;
+    if (confirm("Ushbu xabarni butunlay o'chirmoqchimisiz?")) {
+        ws.send(JSON.stringify({ action: "delete_msg", msg_id: msgId }));
+    }
+}
+
+function clearLocalChat() {
+    if (confirm("Chat xabarlarini ekrandan tozalamoqchimisiz?")) {
+        const box = document.getElementById("chat-messages");
+        if (box) box.innerHTML = "";
+    }
 }
 
 function sendChat() {
@@ -947,7 +1030,7 @@ function sendChat() {
     inp.value = "";
 }
 
-function appendChatBubble(sender, avatar, text, isSelf, isSystem, isLastWord, isMafia, role) {
+function appendChatBubble(sender, avatar, text, isSelf, isSystem, isLastWord, isMafia, role, msgId, senderId) {
     const box = document.getElementById("chat-messages");
     if (isSystem) {
         const s = document.createElement("div");
@@ -956,14 +1039,21 @@ function appendChatBubble(sender, avatar, text, isSelf, isSystem, isLastWord, is
         box.appendChild(s);
     } else {
         const row = document.createElement("div");
+        if (msgId) row.id = "msg-" + msgId;
         row.className = `tg-msg-row ${isSelf ? 'self' : ''} ${isLastWord ? 'last-word-msg' : ''} ${isMafia ? 'mafia-msg' : ''}`;
         
         const mafiaBadgeHtml = isMafia ? '<span class="mafia-badge-pill">🕶️ MAFIA</span> ' : '';
+        const canDelete = (isSelf || isHost) && msgId;
+        const deleteBtnHtml = canDelete ? `<button class="msg-delete-btn" onclick="deleteChatMessage('${msgId}')" title="Xabarni o'chirish">🗑️</button>` : '';
+        const targetSid = senderId || (isSelf ? userId : '');
 
         row.innerHTML = `
-            <img src="${avatar || presetAvatars[0]}" class="tg-msg-avatar">
+            <img src="${avatar || presetAvatars[0]}" class="tg-msg-avatar" onclick="openPlayerCard('${targetSid}')" title="${sender} profilini ko'rish">
             <div class="tg-msg-bubble">
-                <div class="tg-sender-name">${mafiaBadgeHtml}${sender} ${isLastWord ? '(Oxirgi so\'z)' : ''}</div>
+                <div style="display:flex; justify-content:space-between; align-items:center; gap:6px;">
+                    <div class="tg-sender-name" onclick="openPlayerCard('${targetSid}')" style="cursor:pointer;">${mafiaBadgeHtml}${sender} ${isLastWord ? '(Oxirgi so\'z)' : ''}</div>
+                    ${deleteBtnHtml}
+                </div>
                 <div class="tg-msg-text">${text}</div>
             </div>
         `;

@@ -369,8 +369,32 @@ async def quick_join_api():
         return JSONResponse({"room_id": chosen.id})
     return JSONResponse({"room_id": None})
 
+@app.get("/api/user_stats/{target_user_id}")
+async def get_user_stats_api(target_user_id: str):
+    sid = str(target_user_id)
+    u = stats_db.get(sid, {})
+    games = u.get("games", 0)
+    wins = u.get("wins", 0)
+    rate = f"{round((wins / games) * 100)}%" if games > 0 else "0%"
+    m_games = u.get("mafia_games", 0)
+    m_wins = u.get("mafia_wins", 0)
+    m_rate = f"{round((m_wins / m_games) * 100)}%" if m_games > 0 else "0%"
+    return JSONResponse({
+        "id": sid,
+        "name": u.get("name", "O'yinchi"),
+        "avatar": u.get("avatar", ""),
+        "games": games,
+        "wins": wins,
+        "rate": rate,
+        "mafia_games": m_games,
+        "mafia_wins": m_wins,
+        "mafia_rate": m_rate
+    })
+
 async def broadcast(room: GameRoom, data: dict):
     if data.get("type") == "chat":
+        if not data.get("msg_id"):
+            data["msg_id"] = f"msg_{random.randint(100000, 999999)}"
         room.chat_history.append(data)
     disconnected = []
     for pid, p in list(room.players.items()):
@@ -387,14 +411,31 @@ async def broadcast(room: GameRoom, data: dict):
             room.players[pid].ws = None
 
 def get_public_players(room: GameRoom):
-    return [{
-        "id": p.id,
-        "name": p.name,
-        "avatar": p.avatar,
-        "is_alive": p.is_alive,
-        "rais_revealed": getattr(p, "rais_revealed", False),
-        "is_bot": getattr(p, "is_bot", False)
-    } for p in room.players.values()]
+    res = []
+    for p in room.players.values():
+        sid = str(p.id)
+        st = stats_db.get(sid, {})
+        games = st.get("games", 0)
+        wins = st.get("wins", 0)
+        rate = f"{round((wins / games) * 100)}%" if games > 0 else "0%"
+        m_games = st.get("mafia_games", 0)
+        m_wins = st.get("mafia_wins", 0)
+        m_rate = f"{round((m_wins / m_games) * 100)}%" if m_games > 0 else "0%"
+        res.append({
+            "id": p.id,
+            "name": p.name,
+            "avatar": p.avatar,
+            "is_alive": p.is_alive,
+            "rais_revealed": getattr(p, "rais_revealed", False),
+            "is_bot": getattr(p, "is_bot", False),
+            "games": games,
+            "wins": wins,
+            "rate": rate,
+            "mafia_games": m_games,
+            "mafia_wins": m_wins,
+            "mafia_rate": m_rate
+        })
+    return res
 
 async def trigger_last_word(room: GameRoom, victim: Player):
     room.phase = "last_word"
@@ -979,12 +1020,14 @@ async def ws_handler(websocket: WebSocket, room_id: str, user_id: str, name: str
                 if player.role in ["mafia", "mafiaboshi", "xufya"]:
                     msg = data.get("text", "").strip()
                     if msg:
+                        m_id_code = f"msg_{random.randint(100000, 999999)}"
                         # Faqat tirik mafia jamoasiga yuboriladi (Tinch aholi aslo ko'rmaydi!)
                         for m_id, m_p in room.players.items():
                             if m_p.ws and m_p.role in ["mafia", "mafiaboshi", "xufya"]:
                                 try:
                                     await m_p.ws.send_json({
                                         "type": "chat",
+                                        "msg_id": m_id_code,
                                         "sender": player.name,
                                         "sender_id": player.id,
                                         "avatar": player.avatar,
@@ -995,6 +1038,23 @@ async def ws_handler(websocket: WebSocket, room_id: str, user_id: str, name: str
                                     })
                                 except Exception:
                                     pass
+
+            elif act == "delete_msg" and player:
+                msg_id = data.get("msg_id")
+                target_msg = next((m for m in room.chat_history if m.get("msg_id") == msg_id), None)
+                can_del = False
+                if target_msg:
+                    if target_msg.get("sender_id") == user_id or room.host_id == user_id:
+                        can_del = True
+                        room.chat_history = [m for m in room.chat_history if m.get("msg_id") != msg_id]
+                else:
+                    can_del = True
+
+                if can_del and msg_id:
+                    await broadcast(room, {
+                        "type": "msg_deleted",
+                        "msg_id": msg_id
+                    })
 
             elif act == "vote" and player and player.is_alive:
                 if room.phase in ["voting", "revoting"]:
